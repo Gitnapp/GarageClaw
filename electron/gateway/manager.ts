@@ -11,7 +11,6 @@ import { PORTS } from '../utils/config';
 import {
   appendNodeRequireToNodeOptions,
 } from '../utils/paths';
-import { getSetting } from '../utils/store';
 import { JsonRpcNotification, isNotification, isResponse } from './protocol';
 import { logger } from '../utils/logger';
 import {
@@ -37,7 +36,7 @@ import {
 import { dispatchJsonRpcNotification, dispatchProtocolEvent } from './event-dispatch';
 import { GatewayStateController } from './state';
 import { prepareGatewayLaunchContext } from './config-sync';
-import { buildGatewayConnectFrame, probeGatewayReady } from './ws-client';
+import { connectGatewaySocket, probeGatewayReady } from './ws-client';
 import {
   findExistingGatewayProcess,
   isTransientGatewayStartError,
@@ -788,172 +787,30 @@ export class GatewayManager extends EventEmitter {
    * Connect WebSocket to Gateway
    */
   private async connect(port: number, _externalToken?: string): Promise<void> {
-    logger.debug(`Connecting Gateway WebSocket (ws://localhost:${port}/ws)`);
-
-    return new Promise((resolve, reject) => {
-      // WebSocket URL (token will be sent in connect handshake, not URL)
-      const wsUrl = `ws://localhost:${port}/ws`;
-
-      this.ws = new WebSocket(wsUrl);
-      let handshakeComplete = false;
-      let connectId: string | null = null;
-      let handshakeTimeout: NodeJS.Timeout | null = null;
-      let settled = false;
-
-      let challengeTimer: NodeJS.Timeout | null = null;
-
-      const cleanupHandshakeRequest = () => {
-        if (challengeTimer) {
-          clearTimeout(challengeTimer);
-          challengeTimer = null;
-        }
-        if (handshakeTimeout) {
-          clearTimeout(handshakeTimeout);
-          handshakeTimeout = null;
-        }
-        if (connectId && this.pendingRequests.has(connectId)) {
-          const request = this.pendingRequests.get(connectId);
-          if (request) {
-            clearTimeout(request.timeout);
-          }
-          this.pendingRequests.delete(connectId);
-        }
-      };
-
-      const resolveOnce = () => {
-        if (settled) return;
-        settled = true;
-        cleanupHandshakeRequest();
-        resolve();
-      };
-
-      const rejectOnce = (error: unknown) => {
-        if (settled) return;
-        settled = true;
-        cleanupHandshakeRequest();
-        const err = error instanceof Error ? error : new Error(String(error));
-        reject(err);
-      };
-
-      // Sends the connect frame using the server-issued challenge nonce.
-      const sendConnectHandshake = async (challengeNonce: string) => {
-        logger.debug('Sending connect handshake with challenge nonce');
-
-        const currentToken = await getSetting('gatewayToken');
-        const connectPayload = buildGatewayConnectFrame({
-          challengeNonce,
-          token: currentToken,
-          deviceIdentity: this.deviceIdentity,
-          platform: process.platform,
+    this.ws = await connectGatewaySocket({
+      port,
+      deviceIdentity: this.deviceIdentity,
+      platform: process.platform,
+      pendingRequests: this.pendingRequests,
+      getToken: async () => await import('../utils/store').then(({ getSetting }) => getSetting('gatewayToken')),
+      onHandshakeComplete: (ws) => {
+        this.ws = ws;
+        this.setStatus({
+          state: 'running',
+          port,
+          connectedAt: Date.now(),
         });
-        connectId = connectPayload.connectId;
-
-        this.ws?.send(JSON.stringify(connectPayload.frame));
-
-        const requestTimeout = setTimeout(() => {
-          if (!handshakeComplete) {
-            logger.error('Gateway connect handshake timed out');
-            this.ws?.close();
-            rejectOnce(new Error('Connect handshake timeout'));
-          }
-        }, 10000);
-        handshakeTimeout = requestTimeout;
-
-        this.pendingRequests.set(connectId, {
-          resolve: (_result) => {
-            handshakeComplete = true;
-            logger.debug('Gateway connect handshake completed');
-            this.setStatus({
-              state: 'running',
-              port,
-              connectedAt: Date.now(),
-            });
-            this.startPing();
-            resolveOnce();
-          },
-          reject: (error) => {
-            logger.error('Gateway connect handshake failed:', error);
-            rejectOnce(error);
-          },
-          timeout: requestTimeout,
-        });
-      };
-
-      // Timeout for receiving the initial connect.challenge from the server.
-      // Without this, if the server never sends the challenge (e.g. orphaned
-      // process from a different version), the connect() promise hangs forever.
-      challengeTimer = setTimeout(() => {
-        if (!challengeReceived && !settled) {
-          logger.error('Gateway connect.challenge not received within timeout');
-          this.ws?.close();
-          rejectOnce(new Error('Timed out waiting for connect.challenge from Gateway'));
-        }
-      }, 10000);
-
-      this.ws.on('open', () => {
-        logger.debug('Gateway WebSocket opened, waiting for connect.challenge...');
-      });
-
-      let challengeReceived = false;
-
-      this.ws.on('message', (data) => {
-        try {
-          const message = JSON.parse(data.toString());
-
-          // Intercept the connect.challenge event before the general handler
-          if (
-            !challengeReceived &&
-            typeof message === 'object' && message !== null &&
-            message.type === 'event' && message.event === 'connect.challenge'
-          ) {
-            challengeReceived = true;
-            if (challengeTimer) {
-              clearTimeout(challengeTimer);
-              challengeTimer = null;
-            }
-            const nonce = message.payload?.nonce as string | undefined;
-            if (!nonce) {
-              rejectOnce(new Error('Gateway connect.challenge missing nonce'));
-              return;
-            }
-            logger.debug('Received connect.challenge, sending handshake');
-            sendConnectHandshake(nonce);
-            return;
-          }
-
-          this.handleMessage(message);
-        } catch (error) {
-          logger.debug('Failed to parse Gateway WebSocket message:', error);
-        }
-      });
-
-      this.ws.on('close', (code, reason) => {
-        const reasonStr = reason?.toString() || 'unknown';
-        logger.warn(`Gateway WebSocket closed (code=${code}, reason=${reasonStr}, handshake=${handshakeComplete ? 'ok' : 'pending'})`);
-        if (!handshakeComplete) {
-          // If the socket closes before the handshake completes, it usually means the server is still starting or restarting.
-          // Rejecting this promise will cause the caller (startProcess/reconnect logic) to retry cleanly.
-          rejectOnce(new Error(`WebSocket closed before handshake: ${reasonStr}`));
-          return;
-        }
-        cleanupHandshakeRequest();
+        this.startPing();
+      },
+      onMessage: (message) => {
+        this.handleMessage(message);
+      },
+      onCloseAfterHandshake: () => {
         if (this.status.state === 'running') {
           this.setStatus({ state: 'stopped' });
           this.scheduleReconnect();
         }
-      });
-
-      this.ws.on('error', (error) => {
-        // Suppress noisy ECONNREFUSED/WebSocket handshake errors that happen during expected Gateway restarts.
-        if (error.message?.includes('closed before handshake') || (error as NodeJS.ErrnoException).code === 'ECONNREFUSED') {
-          logger.debug(`Gateway WebSocket connection error (transient): ${error.message}`);
-        } else {
-          logger.error('Gateway WebSocket error:', error);
-        }
-        if (!handshakeComplete) {
-          rejectOnce(error);
-        }
-      });
+      },
     });
   }
 
