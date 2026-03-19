@@ -32,6 +32,7 @@ import {
   markQuitCleanupCompleted,
   requestQuitLifecycleAction,
 } from './quit-lifecycle';
+import { createSignalQuitHandler } from './signal-quit';
 import { acquireProcessInstanceFileLock } from './process-instance-lock';
 import { getSetting } from '../utils/store';
 import { ensureBuiltinSkillsInstalled, ensurePreinstalledSkillsInstalled } from '../utils/skill-config';
@@ -90,8 +91,13 @@ if (gotElectronLock) {
     gotFileLock = fileLock.acquired;
     releaseProcessInstanceFileLock = fileLock.release;
     if (!fileLock.acquired) {
+      const ownerDescriptor = fileLock.ownerPid
+        ? `${fileLock.ownerFormat ?? 'legacy'} pid=${fileLock.ownerPid}`
+        : fileLock.ownerFormat === 'unknown'
+          ? 'unknown lock format/content'
+          : 'unknown owner';
       console.info(
-        `[ClawX] Another instance already holds process lock (${fileLock.lockPath}${fileLock.ownerPid ? `, pid=${fileLock.ownerPid}` : ''}); exiting duplicate process`,
+        `[ClawX] Another instance already holds process lock (${fileLock.lockPath}, ${ownerDescriptor}); exiting duplicate process`,
       );
       app.exit(0);
     }
@@ -442,18 +448,17 @@ async function initialize(): Promise<void> {
 }
 
 if (gotTheLock) {
-  const releaseProcessLockOnSignal = (signal: NodeJS.Signals): void => {
-    logger.info(`Received ${signal}; releasing instance lock and requesting app quit`);
-    releaseProcessInstanceFileLock();
-    app.quit();
-  };
+  const requestQuitOnSignal = createSignalQuitHandler({
+    logInfo: (message) => logger.info(message),
+    requestQuit: () => app.quit(),
+  });
 
   process.on('exit', () => {
     releaseProcessInstanceFileLock();
   });
 
-  process.once('SIGINT', () => releaseProcessLockOnSignal('SIGINT'));
-  process.once('SIGTERM', () => releaseProcessLockOnSignal('SIGTERM'));
+  process.once('SIGINT', () => requestQuitOnSignal('SIGINT'));
+  process.once('SIGTERM', () => requestQuitOnSignal('SIGTERM'));
 
   app.on('will-quit', () => {
     releaseProcessInstanceFileLock();

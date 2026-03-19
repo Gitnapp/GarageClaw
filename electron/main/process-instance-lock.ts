@@ -1,10 +1,14 @@
 import { closeSync, existsSync, mkdirSync, openSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
+const LOCK_SCHEMA = 'clawx-instance-lock';
+const LOCK_VERSION = 1;
+
 export interface ProcessInstanceFileLock {
   acquired: boolean;
   lockPath: string;
   ownerPid?: number;
+  ownerFormat?: 'legacy' | 'structured' | 'unknown';
   release: () => void;
 }
 
@@ -25,14 +29,67 @@ function defaultPidAlive(pid: number): boolean {
   }
 }
 
-function readLockOwnerPid(lockPath: string): number | undefined {
-  try {
-    const raw = readFileSync(lockPath, 'utf8').trim();
-    const parsed = Number.parseInt(raw, 10);
-    return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
-  } catch {
+type ParsedLockOwner =
+  | { kind: 'legacy'; pid: number }
+  | { kind: 'structured'; pid: number }
+  | { kind: 'unknown' };
+
+interface StructuredLockContent {
+  schema: string;
+  version: number;
+  pid: number;
+}
+
+function parsePositivePid(raw: string): number | undefined {
+  if (!/^\d+$/.test(raw)) {
     return undefined;
   }
+  const parsed = Number.parseInt(raw, 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return undefined;
+  }
+  return parsed;
+}
+
+function parseStructuredLockContent(raw: string): StructuredLockContent | undefined {
+  try {
+    const parsed = JSON.parse(raw) as Partial<StructuredLockContent>;
+    if (
+      parsed?.schema === LOCK_SCHEMA
+      && parsed?.version === LOCK_VERSION
+      && typeof parsed?.pid === 'number'
+      && Number.isFinite(parsed.pid)
+      && parsed.pid > 0
+    ) {
+      return {
+        schema: parsed.schema,
+        version: parsed.version,
+        pid: parsed.pid,
+      };
+    }
+  } catch {
+    // ignore parse errors
+  }
+  return undefined;
+}
+
+function readLockOwner(lockPath: string): ParsedLockOwner {
+  try {
+    const raw = readFileSync(lockPath, 'utf8').trim();
+    const legacyPid = parsePositivePid(raw);
+    if (legacyPid !== undefined) {
+      return { kind: 'legacy', pid: legacyPid };
+    }
+
+    const structured = parseStructuredLockContent(raw);
+    if (structured) {
+      return { kind: 'structured', pid: structured.pid };
+    }
+  } catch {
+    // ignore read errors
+  }
+
+  return { kind: 'unknown' };
 }
 
 export function acquireProcessInstanceFileLock(
@@ -45,11 +102,14 @@ export function acquireProcessInstanceFileLock(
   const lockPath = join(options.userDataDir, `${options.lockName}.instance.lock`);
 
   let ownerPid: number | undefined;
+  let ownerFormat: ProcessInstanceFileLock['ownerFormat'] = 'unknown';
 
   for (let attempt = 0; attempt < 2; attempt += 1) {
     try {
       const fd = openSync(lockPath, 'wx');
       try {
+        // Keep writing legacy numeric format for broad backward compatibility.
+        // Parser accepts both legacy numeric and structured JSON formats.
         writeFileSync(fd, String(pid), 'utf8');
       } finally {
         closeSync(fd);
@@ -75,9 +135,17 @@ export function acquireProcessInstanceFileLock(
         break;
       }
 
-      ownerPid = readLockOwnerPid(lockPath);
+      const owner = readLockOwner(lockPath);
+      if (owner.kind === 'legacy' || owner.kind === 'structured') {
+        ownerPid = owner.pid;
+        ownerFormat = owner.kind;
+      } else {
+        ownerPid = undefined;
+        ownerFormat = 'unknown';
+      }
       const shouldTreatAsStale =
-        ownerPid === undefined || !isPidAlive(ownerPid);
+        (owner.kind === 'legacy' || owner.kind === 'structured')
+        && !isPidAlive(owner.pid);
       if (shouldTreatAsStale && existsSync(lockPath)) {
         try {
           rmSync(lockPath, { force: true });
@@ -95,6 +163,7 @@ export function acquireProcessInstanceFileLock(
     acquired: false,
     lockPath,
     ownerPid,
+    ownerFormat,
     release: () => {
       // no-op when lock wasn't acquired
     },

@@ -57,6 +57,7 @@ describe('process instance file lock', () => {
     expect(first.acquired).toBe(true);
     expect(second.acquired).toBe(false);
     expect(second.ownerPid).toBe(2222);
+    expect(second.ownerFormat).toBe('legacy');
 
     first.release();
   });
@@ -78,7 +79,28 @@ describe('process instance file lock', () => {
     lock.release();
   });
 
-  it('replaces malformed lock file content', () => {
+  it('replaces stale structured lock file when owner pid is not alive', () => {
+    const userDataDir = createTempDir();
+    const lockPath = join(userDataDir, 'clawx.instance.lock');
+    writeFileSync(lockPath, JSON.stringify({
+      schema: 'clawx-instance-lock',
+      version: 1,
+      pid: 7777,
+    }), 'utf8');
+
+    const lock = acquireProcessInstanceFileLock({
+      userDataDir,
+      lockName: 'clawx',
+      pid: 6666,
+      isPidAlive: () => false,
+    });
+
+    expect(lock.acquired).toBe(true);
+    expect(readFileSync(lockPath, 'utf8')).toBe('6666');
+    lock.release();
+  });
+
+  it('does not treat malformed lock file content as stale', () => {
     const userDataDir = createTempDir();
     const lockPath = join(userDataDir, 'clawx.instance.lock');
     writeFileSync(lockPath, 'not-a-pid', 'utf8');
@@ -89,8 +111,31 @@ describe('process instance file lock', () => {
       pid: 6666,
     });
 
-    expect(lock.acquired).toBe(true);
-    expect(readFileSync(lockPath, 'utf8')).toBe('6666');
-    lock.release();
+    expect(lock.acquired).toBe(false);
+    expect(lock.ownerPid).toBeUndefined();
+    expect(lock.ownerFormat).toBe('unknown');
+    expect(readFileSync(lockPath, 'utf8')).toBe('not-a-pid');
+  });
+
+  it('does not treat unknown structured lock schema as stale', () => {
+    const userDataDir = createTempDir();
+    const lockPath = join(userDataDir, 'clawx.instance.lock');
+    writeFileSync(lockPath, JSON.stringify({
+      schema: 'future-lock-schema',
+      version: 2,
+      pid: 8888,
+      owner: 'future-build',
+    }), 'utf8');
+
+    const lock = acquireProcessInstanceFileLock({
+      userDataDir,
+      lockName: 'clawx',
+      pid: 9999,
+    });
+
+    expect(lock.acquired).toBe(false);
+    expect(lock.ownerPid).toBeUndefined();
+    expect(lock.ownerFormat).toBe('unknown');
+    expect(readFileSync(lockPath, 'utf8')).toContain('future-lock-schema');
   });
 });
