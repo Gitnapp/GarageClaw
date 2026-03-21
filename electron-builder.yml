@@ -54,7 +54,7 @@ publish:
     url: https://oss.intelli-spectrum.com/latest
     useMultipleRangeRequest: false
   - provider: github
-    owner: ValueCell-ai
+    owner: Gitnapp
     repo: GarageClaw
 
 # macOS Configuration
