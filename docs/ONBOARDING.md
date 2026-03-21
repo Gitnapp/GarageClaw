@@ -1,8 +1,8 @@
-# ClawX — Developer Onboarding Guide
+# GarageClaw — Developer Onboarding Guide
 
 ## Project Overview
 
-**ClawX** is a cross-platform Electron desktop application (macOS, Windows, Linux) that wraps the **OpenClaw** AI agent gateway in a rich graphical interface.
+**GarageClaw** is a cross-platform Electron desktop application (macOS, Windows, Linux) that wraps the **OpenClaw** AI agent gateway in a rich graphical interface.
 
 | Property | Value |
 |---|---|
@@ -14,13 +14,13 @@
 | **Animation** | Framer Motion |
 | **i18n** | i18next (en/zh/ja) |
 
-**What it does:** Users install AI provider API keys, configure messaging channels (Telegram, WhatsApp, DingTalk, WeCom, Feishu, QQBot, Discord, etc.), create AI agents, and chat — ClawX manages the full lifecycle of the underlying OpenClaw subprocess and keeps its YAML config files in sync.
+**What it does:** Users install AI provider API keys, configure messaging channels (Telegram, WhatsApp, DingTalk, WeCom, Feishu, QQBot, Discord, etc.), create AI agents, and chat — GarageClaw manages the full lifecycle of the underlying OpenClaw subprocess and keeps its YAML config files in sync.
 
 ---
 
 ## Architecture Layers
 
-ClawX is divided into **10 architectural layers**:
+GarageClaw is divided into **10 architectural layers**:
 
 ### 1. Electron Main Process (`electron/main/`)
 Orchestrates the entire app lifecycle: single-instance lock, BrowserWindow creation, system tray, auto-updater, IPC handler registration, proxy configuration, and clean shutdown.
@@ -65,7 +65,7 @@ Renderer-side networking: `api-client.ts` (multi-transport IPC/WS/HTTP), `host-a
 ## Key Concepts
 
 ### The Two Communication Channels
-ClawX uses **two parallel channels** between main and renderer:
+GarageClaw uses **two parallel channels** between main and renderer:
 - **IPC** (`electron/preload/index.ts` + `electron/main/ipc-handlers.ts`) — for privileged, low-latency operations (gateway control, OAuth, window management).
 - **Localhost HTTP** (`electron/api/server.ts` port 3210) — for CRUD REST calls. The renderer hits this with plain `fetch()` routed through `hostapi:fetch` IPC to avoid CORS; a WS/IPC fallback chain is in `src/lib/api-client.ts`.
 
@@ -73,14 +73,14 @@ ClawX uses **two parallel channels** between main and renderer:
 Before each gateway startup, `electron/gateway/config-sync.ts` assembles a `GatewayLaunchContext` from app settings, provider env vars, proxy config, and plugin versions. The gateway subprocess is never mutated live — it is restarted (full) or reloaded (soft push) when config changes.
 
 ### YAML File Ownership
-ClawX owns two YAML files in `~/.openclaw/`:
+GarageClaw owns two YAML files in `~/.openclaw/`:
 - `openclaw.yml` — channel configurations, managed by `electron/utils/channel-config.ts`
 - `agents.yml` — agent definitions and channel bindings, managed by `electron/utils/agent-config.ts`
 
 Changes to these files trigger either a **gateway reload** (plugin/channel tweak) or a **full restart** (agent deletion requiring process-tree kill to release channel bot connections).
 
 ### Provider Auth Sync
-`electron/utils/openclaw-auth.ts` translates ClawX `ProviderConfig` records into OpenClaw environment variables written into `auth-profiles.json` per agent directory. `electron/services/providers/provider-runtime-sync.ts` pushes updates to the live gateway without a restart, by diffing the store and calling gateway RPC directly.
+`electron/utils/openclaw-auth.ts` translates GarageClaw `ProviderConfig` records into OpenClaw environment variables written into `auth-profiles.json` per agent directory. `electron/services/providers/provider-runtime-sync.ts` pushes updates to the live gateway without a restart, by diffing the store and calling gateway RPC directly.
 
 ### Circuit Breaker / Restart Governor
 `electron/gateway/restart-governor.ts` implements exponential backoff with a per-window budget and circuit-breaker open state — if the gateway crashes repeatedly in a short window, further restarts are suppressed until a stable period elapses. `process-policy.ts` contains the pure policy functions (fully unit-tested, zero Electron dependencies).

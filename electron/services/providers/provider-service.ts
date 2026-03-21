@@ -62,7 +62,7 @@ export class ProviderService {
     await ensureProviderStoreMigrated();
     let accounts = await listProviderAccounts();
 
-    // Seed: when ClawX store is empty but OpenClaw config has providers,
+    // Seed: when GarageClaw store is empty but OpenClaw config has providers,
     // create ProviderAccount entries so the settings panel isn't blank.
     // This covers users who configured providers via CLI or openclaw.json directly.
     if (accounts.length === 0) {
@@ -121,7 +121,7 @@ export class ProviderService {
   }
 
   /**
-   * Seed the ClawX provider store from openclaw.json when the store is empty.
+   * Seed the GarageClaw provider store from openclaw.json when the store is empty.
    * This is a one-time operation for users who configured providers externally.
    */
   private async seedAccountsFromOpenClawConfig(): Promise<ProviderAccount[]> {

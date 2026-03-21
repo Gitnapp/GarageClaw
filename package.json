@@ -1,5 +1,5 @@
 {
-    "name": "clawx",
+    "name": "garageclaw",
     "version": "0.2.8",
     "pnpm": {
         "onlyBuiltDependencies": [
@@ -17,9 +17,9 @@
             "https-proxy-agent": "7.0.6"
         }
     },
-    "description": "ClawX - Graphical AI Assistant based on OpenClaw",
+    "description": "GarageClaw - Graphical AI Assistant based on OpenClaw",
     "main": "dist-electron/main/index.js",
-    "author": "ClawX Team",
+    "author": "GarageClaw Team",
     "license": "MIT",
     "private": true,
     "scripts": {
