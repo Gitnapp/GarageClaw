@@ -12,15 +12,15 @@ export default function EmbedLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <main className="min-h-screen bg-transparent px-5 py-5 sm:px-6">
-      <div className="mx-auto flex min-h-[calc(100vh-2.5rem)] max-w-6xl flex-col rounded-[2rem] border border-line bg-panel/95 shadow-[0_24px_90px_rgba(20,33,43,0.08)] backdrop-blur">
-        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-line px-6 py-5">
+    <main className="min-h-screen px-5 py-5 sm:px-6">
+      <div className="mx-auto flex min-h-[calc(100vh-2.5rem)] max-w-6xl flex-col rounded-lg border bg-card shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-4 border-b px-6 py-4">
           <div>
-            <div className="font-mono text-xs uppercase tracking-[0.22em] text-accent">
+            <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               Desktop Embed
             </div>
-            <div className="mt-2 text-lg font-semibold text-foreground">
-              ClawX Platform Surface
+            <div className="mt-1 text-lg font-semibold">
+              GarageClaw Platform
             </div>
           </div>
           <nav className="flex flex-wrap items-center gap-2">
@@ -28,7 +28,7 @@ export default function EmbedLayout({
               <Link
                 key={item.href}
                 href={item.href}
-                className="rounded-full border border-line bg-white/75 px-4 py-2 text-sm font-medium text-foreground transition hover:bg-white"
+                className="rounded-lg border bg-background px-3 py-1.5 text-sm font-medium transition-colors hover:bg-accent"
               >
                 {item.label}
               </Link>

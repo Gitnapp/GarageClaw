@@ -19,78 +19,73 @@ export async function MarketplaceOverview() {
 
   return (
     <div className="space-y-6">
-      <section className="rounded-[2rem] border border-line bg-panel p-8 shadow-[0_16px_45px_rgba(20,33,43,0.05)]">
-        <div className="font-mono text-xs uppercase tracking-[0.22em] text-accent">
-          Marketplace
-        </div>
-        <h1 className="mt-4 text-3xl font-semibold tracking-tight text-foreground">
-          Agents 与 Skills 市场
-        </h1>
-        <p className="mt-4 max-w-3xl text-sm leading-7 text-muted">
-          这里是给 desktop 嵌入和浏览器控制台共用的市场入口。当前先打通浏览、登录态复用和后续 credits / invoke 的衔接位。
+      <div>
+        <h1 className="text-2xl font-semibold">Agents 与 Skills 市场</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          浏览公开的 Agent 和 Skill，Desktop 内嵌和浏览器控制台共用。
         </p>
-      </section>
+      </div>
 
-      <section className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
-        <div className="rounded-[1.75rem] border border-line bg-white/75 p-6 shadow-[0_16px_45px_rgba(20,33,43,0.05)]">
-          <h2 className="text-xl font-semibold text-foreground">Featured Agents</h2>
-          <div className="mt-5 grid gap-3">
+      <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
+        <div className="rounded-lg border bg-card p-6 shadow-sm">
+          <h2 className="text-lg font-semibold">Featured Agents</h2>
+          <div className="mt-4 space-y-2">
             {(agents ?? []).length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-line bg-white/60 px-4 py-5 text-sm text-muted">
+              <div className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
                 还没有公开 Agent。后续上架后会直接出现在这里。
               </div>
             ) : (
               agents?.map((agent) => (
-                <article
+                <div
                   key={agent.id}
-                  className="rounded-2xl border border-line bg-white px-4 py-4"
+                  className="rounded-md border bg-background p-3"
                 >
                   <div className="flex items-center justify-between gap-3">
-                    <div className="font-medium text-foreground">{agent.name}</div>
-                    <div className="rounded-full bg-[#f8efe4] px-3 py-1 font-mono text-[11px] uppercase tracking-[0.14em] text-accent">
+                    <div className="text-sm font-medium">{agent.name}</div>
+                    <span className="rounded-full bg-secondary px-2.5 py-0.5 text-xs font-semibold text-secondary-foreground">
                       {agent.pricing_type ?? "free"}
-                    </div>
+                    </span>
                   </div>
-                  <div className="mt-2 text-sm text-muted">
+                  <div className="mt-1.5 text-sm text-muted-foreground">
                     {agent.description || "正在等待补充 Agent 描述。"}
                   </div>
-                  <div className="mt-3 text-xs font-mono uppercase tracking-[0.14em] text-muted">
+                  <div className="mt-2 text-xs text-muted-foreground">
                     {agent.model}
                   </div>
-                </article>
+                </div>
               ))
             )}
           </div>
         </div>
 
-        <div className="rounded-[1.75rem] border border-line bg-panel p-6 shadow-[0_16px_45px_rgba(20,33,43,0.05)]">
-          <h2 className="text-xl font-semibold text-foreground">Skills Catalog</h2>
-          <div className="mt-5 grid gap-3 sm:grid-cols-2">
+        <div className="rounded-lg border bg-card p-6 shadow-sm">
+          <h2 className="text-lg font-semibold">Skills Catalog</h2>
+          <div className="mt-4 grid gap-2 sm:grid-cols-2">
             {(skills ?? []).length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-line bg-white/60 px-4 py-5 text-sm text-muted sm:col-span-2">
+              <div className="rounded-md border border-dashed p-4 text-sm text-muted-foreground sm:col-span-2">
                 Skills seed 还没有准备好，稍后会在这里展示。
               </div>
             ) : (
               skills?.map((skill) => (
-                <article
+                <div
                   key={skill.id}
-                  className="rounded-2xl border border-line bg-white/75 px-4 py-4"
+                  className="rounded-md border bg-background p-3"
                 >
                   <div className="flex items-center justify-between gap-2">
-                    <div className="font-medium text-foreground">{skill.name}</div>
-                    <div className="text-[11px] font-mono uppercase tracking-[0.14em] text-muted">
+                    <div className="text-sm font-medium">{skill.name}</div>
+                    <span className="text-xs text-muted-foreground">
                       {skill.is_builtin ? "builtin" : skill.category || "skill"}
-                    </div>
+                    </span>
                   </div>
-                  <div className="mt-2 text-sm leading-6 text-muted">
+                  <div className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
                     {skill.description || "等待补充技能说明。"}
                   </div>
-                </article>
+                </div>
               ))
             )}
           </div>
         </div>
-      </section>
+      </div>
     </div>
   );
 }

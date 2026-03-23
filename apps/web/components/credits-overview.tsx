@@ -19,89 +19,82 @@ export async function CreditsOverview() {
 
   return (
     <div className="space-y-6">
-      <section className="rounded-[2rem] border border-line bg-panel p-8 shadow-[0_16px_45px_rgba(20,33,43,0.05)]">
-        <div className="font-mono text-xs uppercase tracking-[0.22em] text-accent">
-          Credits
-        </div>
-        <h1 className="mt-4 text-3xl font-semibold tracking-tight text-foreground">
-          余额与账单
-        </h1>
-        <p className="mt-4 max-w-3xl text-sm leading-7 text-muted">
-          Desktop 会优先读取这里的余额和账单摘要。后续充值、扣费、调用记录都围绕这条 ledger 展开。
+      <div>
+        <h1 className="text-2xl font-semibold">余额与账单</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          查看 credits 余额、充值记录和调用消耗明细。
         </p>
-      </section>
+      </div>
 
-      <section className="grid gap-4 md:grid-cols-3">
-        <article className="rounded-[1.5rem] border border-line bg-white/75 p-6 shadow-[0_16px_45px_rgba(20,33,43,0.05)] md:col-span-1">
-          <div className="font-mono text-xs uppercase tracking-[0.18em] text-muted">
+      <div className="grid gap-4 md:grid-cols-3">
+        <div className="rounded-lg border bg-card p-6 shadow-sm">
+          <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
             Available Balance
           </div>
-          <div className="mt-4 text-4xl font-semibold text-foreground">
+          <div className="mt-3 text-3xl font-semibold">
             {typeof balance === "number" ? balance.toFixed(2) : "0.00"}
           </div>
-          <div className="mt-2 text-sm text-muted">credits</div>
-        </article>
+          <div className="mt-1 text-sm text-muted-foreground">credits</div>
+        </div>
 
-        <article className="rounded-[1.5rem] border border-line bg-white/75 p-6 shadow-[0_16px_45px_rgba(20,33,43,0.05)]">
-          <div className="font-mono text-xs uppercase tracking-[0.18em] text-muted">
+        <div className="rounded-lg border bg-card p-6 shadow-sm">
+          <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
             Entries
           </div>
-          <div className="mt-4 text-4xl font-semibold text-foreground">
+          <div className="mt-3 text-3xl font-semibold">
             {(history ?? []).length}
           </div>
-          <div className="mt-2 text-sm text-muted">latest billing events</div>
-        </article>
+          <div className="mt-1 text-sm text-muted-foreground">latest billing events</div>
+        </div>
 
-        <article className="rounded-[1.5rem] border border-line bg-white/75 p-6 shadow-[0_16px_45px_rgba(20,33,43,0.05)]">
-          <div className="font-mono text-xs uppercase tracking-[0.18em] text-muted">
+        <div className="rounded-lg border bg-card p-6 shadow-sm">
+          <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
             Latest Change
           </div>
-          <div className="mt-4 text-4xl font-semibold text-foreground">
+          <div className="mt-3 text-3xl font-semibold">
             {history?.[0] ? `${history[0].amount > 0 ? "+" : ""}${history[0].amount}` : "--"}
           </div>
-          <div className="mt-2 text-sm text-muted">
+          <div className="mt-1 text-sm text-muted-foreground">
             {history?.[0]?.type ?? "No recent billing records"}
           </div>
-        </article>
-      </section>
+        </div>
+      </div>
 
-      <section className="rounded-[1.75rem] border border-line bg-panel p-6 shadow-[0_16px_45px_rgba(20,33,43,0.05)]">
-        <h2 className="text-xl font-semibold text-foreground">Recent Ledger</h2>
-        <div className="mt-5 space-y-3">
+      <div className="rounded-lg border bg-card p-6 shadow-sm">
+        <h2 className="text-lg font-semibold">Recent Ledger</h2>
+        <div className="mt-4 space-y-2">
           {(history ?? []).length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-line bg-white/60 px-4 py-5 text-sm text-muted">
+            <div className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
               还没有 credits 历史记录。
             </div>
           ) : (
             history?.map((item) => (
-              <article
+              <div
                 key={item.id}
-                className="rounded-2xl border border-line bg-white/75 px-4 py-4"
+                className="flex flex-wrap items-center justify-between gap-3 rounded-md border bg-background p-3"
               >
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <div className="font-medium text-foreground">
-                      {item.description || item.type}
-                    </div>
-                    <div className="mt-1 text-xs text-muted">
-                      {formatDateTime(item.created_at)}
-                    </div>
+                <div>
+                  <div className="text-sm font-medium">
+                    {item.description || item.type}
                   </div>
-                  <div className="text-right">
-                    <div className="font-semibold text-foreground">
-                      {item.amount > 0 ? "+" : ""}
-                      {item.amount}
-                    </div>
-                    <div className="text-xs text-muted">
-                      balance {item.balance_after}
-                    </div>
+                  <div className="mt-0.5 text-xs text-muted-foreground">
+                    {formatDateTime(item.created_at)}
                   </div>
                 </div>
-              </article>
+                <div className="text-right">
+                  <div className="text-sm font-semibold">
+                    {item.amount > 0 ? "+" : ""}
+                    {item.amount}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    balance {item.balance_after}
+                  </div>
+                </div>
+              </div>
             ))
           )}
         </div>
-      </section>
+      </div>
     </div>
   );
 }
