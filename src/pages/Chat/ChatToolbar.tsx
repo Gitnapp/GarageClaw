@@ -4,7 +4,7 @@
  * Rendered in the Header when on the Chat page.
  */
 import { useMemo } from 'react';
-import { RefreshCw, Brain, Bot, Globe } from 'lucide-react';
+import { RefreshCw, Brain, Bot } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useChatStore } from '@/stores/chat';
@@ -12,11 +12,7 @@ import { useAgentsStore } from '@/stores/agents';
 import { cn } from '@/lib/utils';
 import { useTranslation } from 'react-i18next';
 
-interface ChatToolbarProps {
-  onOpenMarketplace?: () => void;
-}
-
-export function ChatToolbar({ onOpenMarketplace }: ChatToolbarProps) {
+export function ChatToolbar() {
   const refresh = useChatStore((s) => s.refresh);
   const loading = useChatStore((s) => s.loading);
   const showThinking = useChatStore((s) => s.showThinking);
@@ -73,21 +69,6 @@ export function ChatToolbar({ onOpenMarketplace }: ChatToolbarProps) {
         </TooltipContent>
       </Tooltip>
 
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8"
-            onClick={onOpenMarketplace}
-          >
-            <Globe className="h-4 w-4" />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>
-          <p>{t('toolbar.marketplace')}</p>
-        </TooltipContent>
-      </Tooltip>
     </div>
   );
 }
