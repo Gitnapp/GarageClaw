@@ -15,7 +15,8 @@
         "refresh": "チャットを更新",
         "showThinking": "思考を表示",
         "hideThinking": "思考を非表示",
-        "currentAgent": "現在の会話相手: {{agent}}"
+        "currentAgent": "現在の会話相手: {{agent}}",
+        "marketplace": "マーケットプレイスを開く"
     },
     "composer": {
         "attachFiles": "ファイルを添付",

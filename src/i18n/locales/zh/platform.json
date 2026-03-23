@@ -1,0 +1,28 @@
+{
+  "marketplace": {
+    "title": "市场",
+    "subtitle": "浏览嵌入式 Web 市场中的 Agents 和 Skills。"
+  },
+  "profile": {
+    "title": "个人资料",
+    "subtitle": "这里展示平台账号状态、credits 和 desktop 集成信息。",
+    "connected": "已连接",
+    "disconnected": "未连接",
+    "refresh": "刷新状态",
+    "disconnect": "断开连接",
+    "openWebProfile": "打开完整账号页",
+    "openCredits": "打开 Credits 页面",
+    "connect": "打开登录页",
+    "manageEmbed": "在嵌入视图中管理",
+    "hideEmbed": "隐藏嵌入视图",
+    "loginHint": "使用你的平台账号登录后，desktop 就能同步个人资料和 credits。",
+    "balance": "可用 Credits",
+    "email": "邮箱",
+    "displayName": "显示名称",
+    "role": "角色",
+    "billingHistory": "最近账单记录",
+    "noHistory": "还没有最近账单记录。",
+    "desktopBridge": "Desktop 桥接",
+    "desktopBridgeDesc": "Desktop 通过 main-process host routes 读取这些数据，并把平台 session 隔离在 renderer 之外。"
+  }
+}

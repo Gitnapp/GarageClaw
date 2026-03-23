@@ -18,6 +18,8 @@ import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/utils';
 import { useStickToBottomInstant } from '@/hooks/use-stick-to-bottom-instant';
 import { useMinLoading } from '@/hooks/use-min-loading';
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { EmbeddedWebView } from '@/components/platform/EmbeddedWebView';
 
 export function Chat() {
   const { t } = useTranslation('chat');
@@ -41,6 +43,7 @@ export function Chat() {
   const cleanupEmptySession = useChatStore((s) => s.cleanupEmptySession);
 
   const [streamingTimestamp, setStreamingTimestamp] = useState<number>(0);
+  const [marketplaceOpen, setMarketplaceOpen] = useState(false);
   const minLoading = useMinLoading(loading && messages.length > 0);
   const { contentRef, scrollRef } = useStickToBottomInstant(currentSessionKey);
 
@@ -94,7 +97,7 @@ export function Chat() {
     <div className={cn("relative flex flex-col -m-6 transition-colors duration-500 dark:bg-background")} style={{ height: 'calc(100vh - 2.5rem)' }}>
       {/* Toolbar */}
       <div className="flex shrink-0 items-center justify-end px-4 py-2">
-        <ChatToolbar />
+        <ChatToolbar onOpenMarketplace={() => setMarketplaceOpen(true)} />
       </div>
 
       {/* Messages Area */}
@@ -182,6 +185,23 @@ export function Chat() {
           </div>
         </div>
       )}
+
+      <Sheet open={marketplaceOpen} onOpenChange={setMarketplaceOpen}>
+        <SheetContent
+          side="right"
+          className="w-[92vw] max-w-[980px] border-l border-black/10 bg-[#ece8de] p-0 dark:border-white/10 dark:bg-background"
+        >
+          <SheetHeader className="border-b border-black/10 px-6 py-5 dark:border-white/10">
+            <SheetTitle>{t('toolbar.marketplace')}</SheetTitle>
+            <SheetDescription>
+              Browse the embedded platform marketplace without leaving the current chat session.
+            </SheetDescription>
+          </SheetHeader>
+          <div className="h-[calc(100%-5.5rem)] p-4">
+            <EmbeddedWebView className="h-full" route="marketplace" title={t('toolbar.marketplace')} />
+          </div>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }

@@ -43,6 +43,8 @@ Whether you're automating workflows, managing AI-powered channels, or scheduling
 
 GarageClaw comes pre-configured with best-practice model providers and natively supports Windows as well as multi-language settings. Of course, you can also fine-tune advanced configurations via **Settings → Advanced → Developer Mode**.
 
+Recent releases also add an additive web-platform layer on top of the existing desktop app: GarageClaw now keeps all native OpenClaw workflows intact while embedding platform login, marketplace browsing, credits, and profile surfaces directly inside the desktop experience.
+
 ---
 ## Screenshot
 
@@ -120,6 +122,12 @@ Environment variables for bundled search skills:
 
 ### 🔐 Secure Provider Integration
 Connect to multiple AI providers (OpenAI, Anthropic, and more) with credentials stored securely in your system's native keychain. OpenAI supports both API key and browser OAuth (Codex subscription) sign-in.
+
+### 🌐 Additive Web Platform Integration
+Keep the native desktop workflow while adding platform-aware capabilities on top. GarageClaw now includes:
+- an embedded Marketplace entry for browsing web-hosted Agents and Skills
+- a native Profile page that reads platform login state and credits through main-process host routes
+- shared embedded web surfaces for login, profile management, and credits without exposing platform session data to the renderer
 
 ### 🌙 Adaptive Theming
 Light mode, dark mode, or system-synchronized themes. GarageClaw adapts to your preferences automatically.
@@ -313,7 +321,7 @@ Chain multiple skills together to create sophisticated automation pipelines. Pro
 │   ├── lib/                 # Unified frontend API + error model
 │   ├── stores/              # Zustand stores (settings/chat/gateway)
 │   ├── components/          # Reusable UI components
-│   ├── pages/               # Setup/Dashboard/Chat/Channels/Skills/Cron/Settings
+│   ├── pages/               # Setup/Chat/Channels/Skills/Cron/Marketplace/Profile/Settings
 │   ├── i18n/                # Localization resources
 │   └── types/               # TypeScript type definitions
 ├── tests/

@@ -1,0 +1,28 @@
+{
+  "marketplace": {
+    "title": "Marketplace",
+    "subtitle": "Browse the embedded web marketplace for agents and skills."
+  },
+  "profile": {
+    "title": "Profile",
+    "subtitle": "Platform account status, credits, and desktop integration live here.",
+    "connected": "Connected",
+    "disconnected": "Not connected",
+    "refresh": "Refresh status",
+    "disconnect": "Disconnect",
+    "openWebProfile": "Open full account page",
+    "openCredits": "Open credits page",
+    "connect": "Open login",
+    "manageEmbed": "Manage in embedded view",
+    "hideEmbed": "Hide embedded view",
+    "loginHint": "Sign in with your platform account to sync your profile and credits into desktop.",
+    "balance": "Available credits",
+    "email": "Email",
+    "displayName": "Display name",
+    "role": "Role",
+    "billingHistory": "Recent billing history",
+    "noHistory": "No recent billing history yet.",
+    "desktopBridge": "Desktop bridge",
+    "desktopBridgeDesc": "Desktop reads this data through main-process host routes and keeps the platform session isolated from the renderer."
+  }
+}
