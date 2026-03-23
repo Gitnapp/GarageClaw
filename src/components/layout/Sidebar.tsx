@@ -10,6 +10,8 @@ import {
   Bot,
   Puzzle,
   Clock,
+  Globe,
+  UserRound,
   Settings as SettingsIcon,
   PanelLeftClose,
   PanelLeft,
@@ -211,6 +213,8 @@ export function Sidebar() {
     { to: '/channels', icon: <Network className="h-[18px] w-[18px]" strokeWidth={2} />, label: t('sidebar.channels') },
     { to: '/skills', icon: <Puzzle className="h-[18px] w-[18px]" strokeWidth={2} />, label: t('sidebar.skills') },
     { to: '/cron', icon: <Clock className="h-[18px] w-[18px]" strokeWidth={2} />, label: t('sidebar.cronTasks') },
+    { to: '/marketplace', icon: <Globe className="h-[18px] w-[18px]" strokeWidth={2} />, label: t('sidebar.marketplace', 'Marketplace') },
+    { to: '/profile', icon: <UserRound className="h-[18px] w-[18px]" strokeWidth={2} />, label: t('sidebar.profile', '账号') },
   ];
 
   return (

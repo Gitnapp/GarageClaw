@@ -17,7 +17,10 @@ import { Skills } from './pages/Skills';
 import { Cron } from './pages/Cron';
 import { Settings } from './pages/Settings';
 import { Setup } from './pages/Setup';
+import { Marketplace } from './pages/Marketplace';
+import { Profile } from './pages/Profile';
 import { useSettingsStore } from './stores/settings';
+import { usePlatformStore } from './stores/platform';
 import { useGatewayStore } from './stores/gateway';
 import { useProviderStore } from './stores/providers';
 import { applyGatewayTransportPreference } from './lib/api-client';
@@ -96,10 +99,16 @@ function App() {
   const setupComplete = useSettingsStore((state) => state.setupComplete);
   const initGateway = useGatewayStore((state) => state.init);
   const initProviders = useProviderStore((state) => state.init);
+  const initPlatformAuth = usePlatformStore((state) => state.initAuth);
 
   useEffect(() => {
     initSettings();
   }, [initSettings]);
+
+  // Initialize Supabase auth session on mount
+  useEffect(() => {
+    initPlatformAuth();
+  }, [initPlatformAuth]);
 
   // Sync i18n language with persisted settings on mount
   useEffect(() => {
@@ -177,6 +186,8 @@ function App() {
             <Route path="/channels" element={<Channels />} />
             <Route path="/skills" element={<Skills />} />
             <Route path="/cron" element={<Cron />} />
+            <Route path="/marketplace" element={<Marketplace />} />
+            <Route path="/profile" element={<Profile />} />
             <Route path="/settings/*" element={<Settings />} />
           </Route>
         </Routes>
