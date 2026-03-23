@@ -90,7 +90,7 @@ describe('ProviderService.listAccounts stale-account cleanup', () => {
     service = new ProviderService();
   });
 
-  it('preserves all accounts when activeProviders is empty (config missing/unreadable)', async () => {
+  it('hides ALL accounts when activeProviders is empty (config missing/deleted)', async () => {
     const accounts = [
       makeAccount({ id: 'custom-1', vendorId: 'custom' as ProviderAccount['vendorId'] }),
       makeAccount({ id: 'moonshot-1', vendorId: 'moonshot' as ProviderAccount['vendorId'] }),
@@ -101,15 +101,12 @@ describe('ProviderService.listAccounts stale-account cleanup', () => {
 
     const result = await service.listAccounts();
 
-    // All accounts should be preserved — none deleted
-    expect(result).toEqual(accounts);
+    // All accounts hidden (not deleted) when config is empty
+    expect(result).toEqual([]);
     expect(mocks.deleteProviderAccount).not.toHaveBeenCalled();
-    expect(mocks.loggerWarn).toHaveBeenCalledWith(
-      expect.stringContaining('skipping stale-account cleanup'),
-    );
   });
 
-  it('removes stale non-builtin accounts when config has active providers', async () => {
+  it('hides stale non-builtin accounts when config has active providers', async () => {
     const accounts = [
       makeAccount({ id: 'moonshot-1', vendorId: 'moonshot' as ProviderAccount['vendorId'] }),
       makeAccount({ id: 'custom-stale', vendorId: 'custom' as ProviderAccount['vendorId'] }),
@@ -120,27 +117,26 @@ describe('ProviderService.listAccounts stale-account cleanup', () => {
 
     const result = await service.listAccounts();
 
-    // custom-stale should be deleted (non-builtin, not active)
-    expect(mocks.deleteProviderAccount).toHaveBeenCalledWith('custom-stale');
-    expect(mocks.deleteProviderAccount).toHaveBeenCalledTimes(1);
+    // custom-stale hidden (not deleted) from display
+    expect(mocks.deleteProviderAccount).not.toHaveBeenCalled();
     expect(result).toHaveLength(1);
     expect(result[0].id).toBe('moonshot-1');
   });
 
-  it('never removes builtin provider accounts even if not in activeProviders', async () => {
+  it('hides builtin provider accounts when not in activeProviders', async () => {
     const accounts = [
       makeAccount({ id: 'anthropic-1', vendorId: 'anthropic' as ProviderAccount['vendorId'] }),
       makeAccount({ id: 'openai-1', vendorId: 'openai' as ProviderAccount['vendorId'] }),
     ];
     mocks.listProviderAccounts.mockResolvedValue(accounts);
-    // Config has some providers, but NOT anthropic or openai explicitly
+    // Config has moonshot, but NOT anthropic or openai
     mocks.getActiveOpenClawProviders.mockResolvedValue(new Set(['moonshot']));
 
     const result = await service.listAccounts();
 
-    // Builtin accounts should be preserved regardless
+    // Builtin accounts also hidden when not in OpenClaw config
     expect(mocks.deleteProviderAccount).not.toHaveBeenCalled();
-    expect(result).toEqual(accounts);
+    expect(result).toEqual([]);
   });
 
   it('returns empty when no accounts and no active OpenClaw providers', async () => {
@@ -167,5 +163,72 @@ describe('ProviderService.listAccounts stale-account cleanup', () => {
 
     expect(mocks.deleteProviderAccount).not.toHaveBeenCalled();
     expect(result).toEqual(accounts);
+  });
+
+  it('imports new providers from OpenClaw config not yet in ClawX store', async () => {
+    const accounts = [
+      makeAccount({ id: 'moonshot', vendorId: 'moonshot' as ProviderAccount['vendorId'] }),
+    ];
+    mocks.listProviderAccounts.mockResolvedValue(accounts);
+    mocks.getActiveOpenClawProviders.mockResolvedValue(new Set(['moonshot', 'siliconflow']));
+    mocks.getOpenClawProvidersConfig.mockResolvedValue({
+      providers: {
+        moonshot: { baseUrl: 'https://api.moonshot.cn/v1' },
+        siliconflow: { baseUrl: 'https://api.siliconflow.cn/v1' },
+      },
+      defaultModel: undefined,
+    });
+
+    const result = await service.listAccounts();
+
+    // moonshot already exists, siliconflow should be imported
+    expect(mocks.saveProviderAccount).toHaveBeenCalledTimes(1);
+    expect(mocks.saveProviderAccount).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'siliconflow' }),
+    );
+    expect(result).toHaveLength(2);
+    expect(result.map((a: ProviderAccount) => a.id)).toContain('siliconflow');
+  });
+
+  it('does not import providers already in ClawX store', async () => {
+    const accounts = [
+      makeAccount({ id: 'moonshot', vendorId: 'moonshot' as ProviderAccount['vendorId'] }),
+    ];
+    mocks.listProviderAccounts.mockResolvedValue(accounts);
+    mocks.getActiveOpenClawProviders.mockResolvedValue(new Set(['moonshot']));
+    mocks.getOpenClawProvidersConfig.mockResolvedValue({
+      providers: {
+        moonshot: { baseUrl: 'https://api.moonshot.cn/v1' },
+      },
+      defaultModel: undefined,
+    });
+
+    const result = await service.listAccounts();
+
+    expect(mocks.saveProviderAccount).not.toHaveBeenCalled();
+    expect(result).toHaveLength(1);
+  });
+
+  it('does not create duplicate when account id differs but vendorId matches', async () => {
+    // User added openrouter via UI → id is "openrouter-uuid", vendorId is "openrouter"
+    // openclaw.json has "openrouter" entry → should NOT import because vendorId matches
+    const accounts = [
+      makeAccount({ id: 'openrouter-uuid-1234', vendorId: 'openrouter' as ProviderAccount['vendorId'] }),
+    ];
+    mocks.listProviderAccounts.mockResolvedValue(accounts);
+    mocks.getActiveOpenClawProviders.mockResolvedValue(new Set(['openrouter']));
+    mocks.getOpenClawProvidersConfig.mockResolvedValue({
+      providers: {
+        openrouter: { baseUrl: 'https://openrouter.ai/api/v1' },
+      },
+      defaultModel: 'openrouter/openai/gpt-5.4',
+    });
+
+    const result = await service.listAccounts();
+
+    // Should NOT create a duplicate "openrouter" account
+    expect(mocks.saveProviderAccount).not.toHaveBeenCalled();
+    expect(result).toHaveLength(1);
+    expect(result[0].id).toBe('openrouter-uuid-1234');
   });
 });

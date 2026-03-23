@@ -557,10 +557,12 @@ function upsertOpenClawProviderEntry(
     models: mergeProviderModels(registryModels, existingModels, runtimeModels),
   };
   if (options.apiKeyEnv) nextProvider.apiKey = options.apiKeyEnv;
-  if (options.headers && Object.keys(options.headers).length > 0) {
-    nextProvider.headers = options.headers;
-  } else {
-    delete nextProvider.headers;
+  if (options.headers !== undefined) {
+    if (Object.keys(options.headers).length > 0) {
+      nextProvider.headers = options.headers;
+    } else {
+      delete nextProvider.headers;
+    }
   }
   if (options.authHeader !== undefined) {
     nextProvider.authHeader = options.authHeader;
@@ -739,6 +741,18 @@ export async function getActiveOpenClawProviders(): Promise<Set<string>> {
           activeProviders.add(pluginId.replace(/-auth$/, ''));
         }
       }
+    }
+
+    // 3. agents.defaults.model.primary — the default model reference encodes
+    //    the provider prefix (e.g. "qwen-portal/coder-model" → "qwen-portal").
+    //    This covers providers that are active via OAuth or env-key but don't
+    //    have an explicit models.providers entry.
+    const agents = config.agents as Record<string, unknown> | undefined;
+    const defaults = agents?.defaults as Record<string, unknown> | undefined;
+    const modelConfig = defaults?.model as Record<string, unknown> | undefined;
+    const primaryModel = typeof modelConfig?.primary === 'string' ? modelConfig.primary : undefined;
+    if (primaryModel?.includes('/')) {
+      activeProviders.add(primaryModel.split('/')[0]);
     }
   } catch (err) {
     console.warn('Failed to read openclaw.json for active providers:', err);

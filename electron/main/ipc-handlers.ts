@@ -60,27 +60,14 @@ import {
 } from '../services/providers/provider-runtime-sync';
 import { validateApiKeyWithProvider } from '../services/providers/provider-validation';
 import { appUpdater } from './updater';
-import { PORTS } from '../utils/config';
-
-type AppRequest = {
-  id?: string;
-  module: string;
-  action: string;
-  payload?: unknown;
-};
-
-type AppErrorCode = 'VALIDATION' | 'PERMISSION' | 'TIMEOUT' | 'GATEWAY' | 'INTERNAL' | 'UNSUPPORTED';
-
-type AppResponse = {
-  id?: string;
-  ok: boolean;
-  data?: unknown;
-  error?: {
-    code: AppErrorCode;
-    message: string;
-    details?: unknown;
-  };
-};
+import { registerHostApiProxyHandlers } from './ipc/host-api-proxy';
+import {
+  isLaunchAtStartupKey,
+  isProxyKey,
+  mapAppErrorCode,
+  type AppRequest,
+  type AppResponse,
+} from './ipc/request-helpers';
 
 /**
  * Register all IPC handlers
@@ -149,92 +136,6 @@ export function registerIpcHandlers(
 
   // File staging handlers (upload/send separation)
   registerFileHandlers();
-}
-
-type HostApiFetchRequest = {
-  path: string;
-  method?: string;
-  headers?: Record<string, string>;
-  body?: unknown;
-};
-
-function registerHostApiProxyHandlers(): void {
-  ipcMain.handle('hostapi:fetch', async (_, request: HostApiFetchRequest) => {
-    try {
-      const path = typeof request?.path === 'string' ? request.path : '';
-      if (!path || !path.startsWith('/')) {
-        throw new Error(`Invalid host API path: ${String(request?.path)}`);
-      }
-
-      const method = (request.method || 'GET').toUpperCase();
-      const headers: Record<string, string> = { ...(request.headers || {}) };
-      let body: string | undefined;
-
-      if (request.body !== undefined && request.body !== null) {
-        if (typeof request.body === 'string') {
-          body = request.body;
-        } else {
-          body = JSON.stringify(request.body);
-          if (!headers['Content-Type'] && !headers['content-type']) {
-            headers['Content-Type'] = 'application/json';
-          }
-        }
-      }
-
-      const response = await proxyAwareFetch(`http://127.0.0.1:${PORTS.GARAGECLAW_HOST_API}${path}`, {
-        method,
-        headers,
-        body,
-      });
-
-      const data: { status: number; ok: boolean; json?: unknown; text?: string } = {
-        status: response.status,
-        ok: response.ok,
-      };
-
-      if (response.status !== 204) {
-        const contentType = response.headers.get('content-type') || '';
-        if (contentType.includes('application/json')) {
-          data.json = await response.json().catch(() => undefined);
-        } else {
-          data.text = await response.text().catch(() => '');
-        }
-      }
-
-      return { ok: true, data };
-    } catch (error) {
-      return {
-        ok: false,
-        error: {
-          message: error instanceof Error ? error.message : String(error),
-        },
-      };
-    }
-  });
-}
-
-function mapAppErrorCode(error: unknown): AppErrorCode {
-  const msg = error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
-  if (msg.includes('timeout')) return 'TIMEOUT';
-  if (msg.includes('permission') || msg.includes('denied') || msg.includes('forbidden')) return 'PERMISSION';
-  if (msg.includes('gateway')) return 'GATEWAY';
-  if (msg.includes('invalid') || msg.includes('required')) return 'VALIDATION';
-  return 'INTERNAL';
-}
-
-function isProxyKey(key: keyof AppSettings): boolean {
-  return (
-    key === 'proxyEnabled' ||
-    key === 'proxyServer' ||
-    key === 'proxyHttpServer' ||
-    key === 'proxyHttpsServer' ||
-    key === 'proxyAllServer' ||
-    key === 'proxyBypassRules'
-  );
-}
-
-function isLaunchAtStartupKey(key: keyof AppSettings): boolean {
-  return key === 'launchAtStartup';
 }
 
 function registerUnifiedRequestHandlers(gatewayManager: GatewayManager): void {
