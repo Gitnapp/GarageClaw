@@ -372,7 +372,7 @@ interface RuntimeContentProps {
 
 const LITELLM_PROXY_URL = 'https://garage-litellm.fly.dev';
 const LITELLM_MGMT_KEY = 'sk-NnZJvx8O4OfFGt2TIk2lcQ';
-const INITIAL_CREDITS = 1.0;
+const INITIAL_CREDITS = 20.0;
 
 interface LoginContentProps {
   onLoginComplete: () => void;
