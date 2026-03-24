@@ -2,6 +2,11 @@ import { create } from 'zustand';
 import type { User } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 
+// ── Constants ──
+
+const LITELLM_PROXY_URL = 'https://garage-litellm.fly.dev';
+const LITELLM_MASTER_KEY = 'garage';
+
 // ── Types (inline, matching Supabase tables) ──
 
 interface ProfileRow {
@@ -10,6 +15,7 @@ interface ProfileRow {
   avatar_url: string | null;
   role: string | null;
   created_at: string | null;
+  litellm_key: string | null;
 }
 
 interface CreditLedgerRow {
@@ -46,6 +52,7 @@ interface PlatformState {
   loading: boolean;
   profile: ProfileRow | null;
   balance: number;
+  litellmKey: string | null;
   history: CreditLedgerRow[];
   agents: AgentRow[];
   skills: SkillRow[];
@@ -56,6 +63,30 @@ interface PlatformState {
   loadProfile: () => Promise<void>;
   loadCredits: () => Promise<void>;
   loadMarketplace: () => Promise<void>;
+  ensureLitellmKey: () => Promise<void>;
+}
+
+async function createLitellmVirtualKey(userId: string, maxBudget: number): Promise<string | null> {
+  try {
+    const response = await fetch(`${LITELLM_PROXY_URL}/key/generate`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${LITELLM_MASTER_KEY}`,
+      },
+      body: JSON.stringify({
+        user_id: userId,
+        max_budget: maxBudget,
+        key_alias: `garageclaw-${userId.slice(0, 8)}`,
+      }),
+    });
+    if (!response.ok) return null;
+    const data = await response.json() as { key?: string };
+    return data.key ?? null;
+  } catch {
+    console.error('[Platform] Failed to create LiteLLM virtual key');
+    return null;
+  }
 }
 
 export const usePlatformStore = create<PlatformState>((set, get) => ({
@@ -63,6 +94,7 @@ export const usePlatformStore = create<PlatformState>((set, get) => ({
   loading: true,
   profile: null,
   balance: 0,
+  litellmKey: null,
   history: [],
   agents: [],
   skills: [],
@@ -72,7 +104,7 @@ export const usePlatformStore = create<PlatformState>((set, get) => ({
     supabase.auth.getUser().then(({ data: { user } }) => {
       set({ user, loading: false });
       if (user) {
-        get().loadProfile();
+        get().loadProfile().then(() => get().ensureLitellmKey());
       }
     });
 
@@ -81,7 +113,7 @@ export const usePlatformStore = create<PlatformState>((set, get) => ({
       const user = session?.user ?? null;
       set({ user, loading: false });
       if (!user) {
-        set({ profile: null, balance: 0, history: [] });
+        set({ profile: null, balance: 0, litellmKey: null, history: [] });
       }
     });
   },
@@ -93,18 +125,44 @@ export const usePlatformStore = create<PlatformState>((set, get) => ({
       set({ loading: false });
       return error.message;
     }
-    // onAuthStateChange will update user; load profile now
     const { data: { user } } = await supabase.auth.getUser();
     set({ user, loading: false });
     if (user) {
-      get().loadProfile();
+      await get().loadProfile();
+      await get().ensureLitellmKey();
     }
     return null;
   },
 
   signOut: async () => {
     await supabase.auth.signOut();
-    set({ user: null, profile: null, balance: 0, history: [] });
+    set({ user: null, profile: null, balance: 0, litellmKey: null, history: [] });
+  },
+
+  ensureLitellmKey: async () => {
+    const { user, profile, balance } = get();
+    if (!user || !profile) return;
+
+    // Already have a key
+    if (profile.litellm_key) {
+      set({ litellmKey: profile.litellm_key });
+      return;
+    }
+
+    // Create new virtual key
+    const key = await createLitellmVirtualKey(user.id, balance);
+    if (!key) return;
+
+    // Save to Supabase
+    await supabase
+      .from('profiles')
+      .update({ litellm_key: key })
+      .eq('id', user.id);
+
+    set({
+      litellmKey: key,
+      profile: { ...profile, litellm_key: key },
+    });
   },
 
   loadProfile: async () => {
@@ -114,15 +172,17 @@ export const usePlatformStore = create<PlatformState>((set, get) => ({
     const [profileResult, balanceResult] = await Promise.all([
       supabase
         .from('profiles')
-        .select('id, display_name, avatar_url, role, created_at')
+        .select('id, display_name, avatar_url, role, created_at, litellm_key')
         .eq('id', user.id)
         .maybeSingle(),
       supabase.rpc('get_balance', { p_user_id: user.id }),
     ]);
 
+    const profile = profileResult.data ?? null;
     set({
-      profile: profileResult.data ?? null,
+      profile,
       balance: typeof balanceResult.data === 'number' ? balanceResult.data : 0,
+      litellmKey: profile?.litellm_key ?? null,
     });
   },
 

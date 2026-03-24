@@ -255,6 +255,28 @@ export const PROVIDER_DEFINITIONS: ProviderDefinition[] = [
     defaultAuthMode: 'api_key',
     supportsMultipleAccounts: true,
   },
+  {
+    id: 'garageclaw-platform',
+    name: 'GarageClaw Platform',
+    icon: '🏗️',
+    placeholder: 'sk-...',
+    model: 'Multi-Model',
+    requiresApiKey: true,
+    category: 'official',
+    envVar: 'GARAGECLAW_LITELLM_KEY',
+    defaultModelId: 'gpt-4o',
+    showBaseUrl: false,
+    showModelId: true,
+    modelIdPlaceholder: 'gpt-4o / claude-opus-4-6 / deepseek-chat',
+    supportedAuthModes: ['api_key'],
+    defaultAuthMode: 'api_key',
+    supportsMultipleAccounts: false,
+    providerConfig: {
+      baseUrl: 'https://garage-litellm.fly.dev',
+      api: 'openai-completions',
+      apiKeyEnv: 'GARAGECLAW_LITELLM_KEY',
+    },
+  },
 ];
 
 const PROVIDER_DEFINITION_MAP = new Map(

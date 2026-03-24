@@ -80,6 +80,7 @@ function ProfileView() {
   const profile = usePlatformStore((s) => s.profile);
   const balance = usePlatformStore((s) => s.balance);
   const history = usePlatformStore((s) => s.history);
+  const litellmKey = usePlatformStore((s) => s.litellmKey);
   const signOut = usePlatformStore((s) => s.signOut);
   const loadProfile = usePlatformStore((s) => s.loadProfile);
   const loadCredits = usePlatformStore((s) => s.loadCredits);
@@ -93,6 +94,7 @@ function ProfileView() {
     { label: 'Email', value: user?.email ?? '未设置' },
     { label: 'Role', value: profile?.role ?? 'user' },
     { label: 'Credits', value: balance.toFixed(2) },
+    { label: 'Platform Key', value: litellmKey ? `${litellmKey.slice(0, 10)}...` : '未分配' },
   ];
 
   return (
