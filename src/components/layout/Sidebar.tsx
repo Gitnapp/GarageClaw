@@ -10,6 +10,8 @@ import {
   Bot,
   Puzzle,
   Clock,
+  Globe,
+  UserRound,
   Settings as SettingsIcon,
   PanelLeftClose,
   PanelLeft,
@@ -211,6 +213,8 @@ export function Sidebar() {
     { to: '/channels', icon: <Network className="h-[18px] w-[18px]" strokeWidth={2} />, label: t('sidebar.channels') },
     { to: '/skills', icon: <Puzzle className="h-[18px] w-[18px]" strokeWidth={2} />, label: t('sidebar.skills') },
     { to: '/cron', icon: <Clock className="h-[18px] w-[18px]" strokeWidth={2} />, label: t('sidebar.cronTasks') },
+    { to: '/marketplace', icon: <Globe className="h-[18px] w-[18px]" strokeWidth={2} />, label: t('sidebar.marketplace', 'Marketplace') },
+    { to: '/profile', icon: <UserRound className="h-[18px] w-[18px]" strokeWidth={2} />, label: t('sidebar.profile', '账号') },
   ];
 
   return (
@@ -224,9 +228,9 @@ export function Sidebar() {
       <div className={cn("flex items-center p-2 h-12", sidebarCollapsed ? "justify-center" : "justify-between")}>
         {!sidebarCollapsed && (
           <div className="flex items-center gap-2 px-2 overflow-hidden">
-            <img src={logoSvg} alt="ClawX" className="h-5 w-auto shrink-0" />
+            <img src={logoSvg} alt="GarageClaw" className="h-5 w-auto shrink-0" />
             <span className="text-sm font-semibold truncate whitespace-nowrap text-foreground/90">
-              ClawX
+              GarageClaw
             </span>
           </div>
         )}

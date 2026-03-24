@@ -35,6 +35,7 @@ import { toast } from 'sonner';
 import { invokeIpc } from '@/lib/api-client';
 import { hostApiFetch } from '@/lib/host-api';
 import { subscribeHostEvent } from '@/lib/host-events';
+import { usePlatformStore } from '@/stores/platform';
 interface SetupStep {
   id: string;
   title: string;
@@ -43,8 +44,8 @@ interface SetupStep {
 
 const STEP = {
   WELCOME: 0,
-  RUNTIME: 1,
-  PROVIDER: 2,
+  LOGIN: 1,
+  RUNTIME: 2,
   INSTALLING: 3,
   COMPLETE: 4,
 } as const;
@@ -56,14 +57,14 @@ const getSteps = (t: TFunction): SetupStep[] => [
     description: t('steps.welcome.description'),
   },
   {
+    id: 'login',
+    title: t('steps.login.title', '登录平台'),
+    description: t('steps.login.description', '登录或注册你的 GarageClaw 平台账号'),
+  },
+  {
     id: 'runtime',
     title: t('steps.runtime.title'),
     description: t('steps.runtime.description'),
-  },
-  {
-    id: 'provider',
-    title: t('steps.provider.title'),
-    description: t('steps.provider.description'),
   },
   {
     id: 'installing',
@@ -110,7 +111,7 @@ import {
   hasConfiguredCredentials,
   pickPreferredAccount,
 } from '@/lib/provider-accounts';
-import clawxIcon from '@/assets/logo.svg';
+import garageclawIcon from '@/assets/logo.svg';
 
 // Use the shared provider registry for setup providers
 const providers = SETUP_PROVIDERS;
@@ -130,7 +131,9 @@ function getProtocolBaseUrlPlaceholder(
 export function Setup() {
   const { t } = useTranslation(['setup', 'channels']);
   const navigate = useNavigate();
-  const [currentStep, setCurrentStep] = useState<number>(STEP.WELCOME);
+  const setupComplete = useSettingsStore((state) => state.setupComplete);
+  // If setup was already complete (user logged out), skip to LOGIN step
+  const [currentStep, setCurrentStep] = useState<number>(setupComplete ? STEP.LOGIN : STEP.WELCOME);
 
   // Setup state
   const [selectedProvider, setSelectedProvider] = useState<string | null>(null);
@@ -140,6 +143,8 @@ export function Setup() {
   const [installedSkills, setInstalledSkills] = useState<string[]>([]);
   // Runtime check status
   const [runtimeChecksPassed, setRuntimeChecksPassed] = useState(false);
+  // Login state
+  const [loginComplete, setLoginComplete] = useState(false);
 
   const steps = getSteps(t);
   const safeStepIndex = Number.isInteger(currentStep)
@@ -156,10 +161,10 @@ export function Setup() {
     switch (safeStepIndex) {
       case STEP.WELCOME:
         return true;
+      case STEP.LOGIN:
+        return loginComplete;
       case STEP.RUNTIME:
         return runtimeChecksPassed;
-      case STEP.PROVIDER:
-        return providerConfigured;
       case STEP.INSTALLING:
         return false; // Cannot manually proceed, auto-proceeds when done
       case STEP.COMPLETE:
@@ -167,7 +172,7 @@ export function Setup() {
       default:
         return true;
     }
-  }, [safeStepIndex, providerConfigured, runtimeChecksPassed]);
+  }, [safeStepIndex, loginComplete, runtimeChecksPassed]);
 
   const handleNext = async () => {
     if (isLastStep) {
@@ -254,17 +259,8 @@ export function Setup() {
             {/* Step-specific content */}
             <div className="rounded-xl bg-card text-card-foreground border shadow-sm p-8 mb-8">
               {safeStepIndex === STEP.WELCOME && <WelcomeContent />}
+              {safeStepIndex === STEP.LOGIN && <LoginContent onLoginComplete={() => setLoginComplete(true)} />}
               {safeStepIndex === STEP.RUNTIME && <RuntimeContent onStatusChange={setRuntimeChecksPassed} />}
-              {safeStepIndex === STEP.PROVIDER && (
-                <ProviderContent
-                  providers={providers}
-                  selectedProvider={selectedProvider}
-                  onSelectProvider={setSelectedProvider}
-                  apiKey={apiKey}
-                  onApiKeyChange={setApiKey}
-                  onConfiguredChange={setProviderConfigured}
-                />
-              )}
               {safeStepIndex === STEP.INSTALLING && (
                 <InstallingContent
                   skills={getDefaultSkills(t)}
@@ -274,7 +270,7 @@ export function Setup() {
               )}
               {safeStepIndex === STEP.COMPLETE && (
                 <CompleteContent
-                  selectedProvider={selectedProvider}
+                  selectedProvider="garageclaw-platform"
                   installedSkills={installedSkills}
                 />
               )}
@@ -292,7 +288,7 @@ export function Setup() {
                   )}
                 </div>
                 <div className="flex gap-2">
-                  {!isLastStep && safeStepIndex !== STEP.RUNTIME && (
+                  {!isLastStep && safeStepIndex !== STEP.RUNTIME && safeStepIndex !== STEP.LOGIN && (
                     <Button variant="ghost" onClick={handleSkip}>
                       {t('nav.skipSetup')}
                     </Button>
@@ -326,7 +322,7 @@ function WelcomeContent() {
   return (
     <div className="text-center space-y-4">
       <div className="mb-4 flex justify-center">
-        <img src={clawxIcon} alt="ClawX" className="h-16 w-16" />
+        <img src={garageclawIcon} alt="GarageClaw" className="h-16 w-16" />
       </div>
       <h2 className="text-xl font-semibold">{t('welcome.title')}</h2>
       <p className="text-muted-foreground">
@@ -372,6 +368,172 @@ function WelcomeContent() {
 
 interface RuntimeContentProps {
   onStatusChange: (canProceed: boolean) => void;
+}
+
+const LITELLM_PROXY_URL = 'https://garage-litellm.fly.dev';
+const LITELLM_MGMT_KEY = 'sk-NnZJvx8O4OfFGt2TIk2lcQ';
+const INITIAL_CREDITS = 20.0;
+
+interface LoginContentProps {
+  onLoginComplete: () => void;
+}
+
+function LoginContent({ onLoginComplete }: LoginContentProps) {
+  const { t } = useTranslation('setup');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [info, setInfo] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [done, setDone] = useState(false);
+
+  const user = usePlatformStore((s) => s.user);
+  const signIn = usePlatformStore((s) => s.signIn);
+  const ensureLitellmKey = usePlatformStore((s) => s.ensureLitellmKey);
+  const loadProfile = usePlatformStore((s) => s.loadProfile);
+
+  // If already logged in, auto-complete
+  useEffect(() => {
+    if (user && !done) {
+      setDone(true);
+      onLoginComplete();
+    }
+  }, [user, done, onLoginComplete]);
+
+  const completeLogin = async () => {
+    await loadProfile();
+
+    // Grant credits FIRST so ensureLitellmKey sees the correct balance
+    try {
+      const { supabase } = await import('@/lib/supabase');
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      if (currentUser) {
+        await supabase.rpc('grant_welcome_credits', {
+          p_user_id: currentUser.id,
+          p_amount: INITIAL_CREDITS,
+        });
+      }
+    } catch {
+      console.error('[Setup] Failed to assign initial credits');
+    }
+
+    // Now create/sync LiteLLM key with correct budget
+    await ensureLitellmKey();
+
+    setDone(true);
+    onLoginComplete();
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setInfo(null);
+    setLoading(true);
+
+    try {
+      // Try sign in first
+      const loginErr = await signIn(email, password);
+      if (!loginErr) {
+        await completeLogin();
+        return;
+      }
+
+      // If login failed, try to register
+      const { supabase } = await import('@/lib/supabase');
+      const { error: signUpError } = await supabase.auth.signUp({ email, password });
+      if (signUpError) {
+        setError(signUpError.message);
+        return;
+      }
+
+      // Try auto sign in after register
+      const retryErr = await signIn(email, password);
+      if (!retryErr) {
+        await completeLogin();
+        return;
+      }
+
+      // If still can't sign in, email confirmation is likely required
+      setInfo('已发送确认邮件到你的邮箱，请点击邮件中的确认链接，然后回到这里再次点击「继续」按钮。');
+    } catch (err) {
+      setError(String(err));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (done) {
+    return (
+      <div className="text-center space-y-4">
+        <CheckCircle2 className="h-12 w-12 text-green-500 mx-auto" />
+        <h2 className="text-xl font-semibold">登录成功</h2>
+        <p className="text-muted-foreground">平台账号已配置，AI 服务已就绪</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="text-center">
+        <h2 className="text-xl font-semibold">登录 / 注册</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          输入邮箱和密码，已有账号直接登录，新用户自动注册
+        </p>
+      </div>
+
+      <form onSubmit={handleSubmit} className="space-y-4 max-w-sm mx-auto">
+        <div>
+          <Label htmlFor="setup-email">邮箱</Label>
+          <Input
+            id="setup-email"
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+            placeholder="you@example.com"
+            className="mt-1"
+          />
+        </div>
+        <div>
+          <Label htmlFor="setup-password">密码</Label>
+          <Input
+            id="setup-password"
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            placeholder="••••••••"
+            className="mt-1"
+            minLength={6}
+          />
+        </div>
+
+        {info && (
+          <div className="flex items-start gap-2 rounded-md border border-primary/30 bg-primary/5 px-3 py-3 text-sm text-foreground">
+            <Check className="h-4 w-4 shrink-0 mt-0.5 text-primary" />
+            <span>{info}</span>
+          </div>
+        )}
+
+        {error && !info && (
+          <div className="flex items-center gap-2 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+            <AlertCircle className="h-4 w-4 shrink-0" />
+            {error}
+          </div>
+        )}
+
+        <Button type="submit" className="w-full" disabled={loading}>
+          {loading ? (
+            <><Loader2 className="h-4 w-4 mr-2 animate-spin" />处理中...</>
+          ) : info ? (
+            '已确认，继续'
+          ) : (
+            '继续'
+          )}
+        </Button>
+      </form>
+    </div>
+  );
 }
 
 function RuntimeContent({ onStatusChange }: RuntimeContentProps) {
@@ -727,6 +889,7 @@ function ProviderContent({
   const providerMenuRef = useRef<HTMLDivElement | null>(null);
 
   const [authMode, setAuthMode] = useState<'oauth' | 'apikey'>('oauth');
+  const [arkMode, setArkMode] = useState<'apikey' | 'codeplan'>('apikey');
 
   // OAuth Flow State
   const [oauthFlowing, setOauthFlowing] = useState(false);
@@ -939,9 +1102,22 @@ function ProviderContent({
           onApiKeyChange(storedKey || '');
 
           const info = providers.find((p) => p.id === selectedProvider);
-          setBaseUrl(savedProvider?.baseUrl || info?.defaultBaseUrl || '');
-          setModelId(savedProvider?.model || info?.defaultModelId || '');
+          const nextBaseUrl = savedProvider?.baseUrl || info?.defaultBaseUrl || '';
+          const nextModelId = savedProvider?.model || info?.defaultModelId || '';
+          setBaseUrl(nextBaseUrl);
+          setModelId(nextModelId);
           setApiProtocol(savedProvider?.apiProtocol || 'openai-completions');
+          if (
+            selectedProvider === 'ark'
+            && info?.codePlanPresetBaseUrl
+            && info?.codePlanPresetModelId
+            && nextBaseUrl.trim() === info.codePlanPresetBaseUrl
+            && nextModelId.trim() === info.codePlanPresetModelId
+          ) {
+            setArkMode('codeplan');
+          } else {
+            setArkMode('apikey');
+          }
         }
       } catch (error) {
         if (!cancelled) {
@@ -977,11 +1153,20 @@ function ProviderContent({
 
   const selectedProviderData = providers.find((p) => p.id === selectedProvider);
   const providerDocsUrl = getProviderDocsUrl(selectedProviderData, i18n.language);
+  const effectiveProviderDocsUrl = selectedProvider === 'ark' && arkMode === 'codeplan'
+    ? (selectedProviderData?.codePlanDocsUrl || providerDocsUrl)
+    : providerDocsUrl;
   const selectedProviderIconUrl = selectedProviderData
     ? getProviderIconUrl(selectedProviderData.id)
     : undefined;
   const showBaseUrlField = selectedProviderData?.showBaseUrl ?? false;
   const showModelIdField = shouldShowProviderModelId(selectedProviderData, devModeUnlocked);
+  const codePlanPreset = selectedProviderData?.codePlanPresetBaseUrl && selectedProviderData?.codePlanPresetModelId
+    ? {
+      baseUrl: selectedProviderData.codePlanPresetBaseUrl,
+      modelId: selectedProviderData.codePlanPresetModelId,
+    }
+    : null;
   const requiresKey = selectedProviderData?.requiresApiKey ?? false;
   const isOAuth = selectedProviderData?.isOAuth ?? false;
   const supportsApiKey = selectedProviderData?.supportsApiKey ?? false;
@@ -1135,6 +1320,7 @@ function ProviderContent({
     setKeyValid(null);
     setProviderMenuOpen(false);
     setAuthMode('oauth');
+    setArkMode('apikey');
   };
 
   return (
@@ -1143,9 +1329,9 @@ function ProviderContent({
       <div className="space-y-2">
         <div className="flex items-center justify-between gap-3">
           <Label>{t('provider.label')}</Label>
-          {selectedProvider && providerDocsUrl && (
+          {selectedProvider && effectiveProviderDocsUrl && (
             <a
-              href={providerDocsUrl}
+              href={effectiveProviderDocsUrl}
               target="_blank"
               rel="noopener noreferrer"
               className="text-[13px] text-blue-500 hover:text-blue-600 font-medium inline-flex items-center gap-1"
@@ -1241,6 +1427,68 @@ function ProviderContent({
           animate={{ opacity: 1, y: 0 }}
           className="space-y-4"
         >
+          {codePlanPreset && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between gap-3">
+                <Label>{t('provider.codePlanPreset')}</Label>
+                {selectedProviderData?.codePlanDocsUrl && (
+                  <a
+                    href={selectedProviderData.codePlanDocsUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[13px] text-blue-500 hover:text-blue-600 font-medium inline-flex items-center gap-1"
+                  >
+                    {t('provider.codePlanDoc')}
+                    <ExternalLink className="h-3 w-3" />
+                  </a>
+                )}
+              </div>
+              <div className="flex gap-2 text-sm">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setArkMode('apikey');
+                    setBaseUrl(selectedProviderData?.defaultBaseUrl || '');
+                    if (modelId.trim() === codePlanPreset.modelId) {
+                      setModelId(selectedProviderData?.defaultModelId || '');
+                    }
+                    onConfiguredChange(false);
+                  }}
+                  className={cn(
+                    'flex-1 py-2 px-3 rounded-lg border transition-colors',
+                    arkMode === 'apikey'
+                      ? 'bg-primary/10 border-primary/30 font-medium'
+                      : 'border-border bg-muted/40 text-muted-foreground hover:bg-muted'
+                  )}
+                >
+                  {t('settings:aiProviders.authModes.apiKey')}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setArkMode('codeplan');
+                    setBaseUrl(codePlanPreset.baseUrl);
+                    setModelId(codePlanPreset.modelId);
+                    onConfiguredChange(false);
+                  }}
+                  className={cn(
+                    'flex-1 py-2 px-3 rounded-lg border transition-colors',
+                    arkMode === 'codeplan'
+                      ? 'bg-primary/10 border-primary/30 font-medium'
+                      : 'border-border bg-muted/40 text-muted-foreground hover:bg-muted'
+                  )}
+                >
+                  {t('provider.codePlanMode')}
+                </button>
+              </div>
+              {arkMode === 'codeplan' && (
+                <p className="text-xs text-muted-foreground">
+                  {t('provider.codePlanPresetDesc')}
+                </p>
+              )}
+            </div>
+          )}
+
           {/* Base URL field (for siliconflow, ollama, custom) */}
           {showBaseUrlField && (
             <div className="space-y-2">

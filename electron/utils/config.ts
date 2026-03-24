@@ -8,13 +8,13 @@
  */
 export const PORTS = {
   /** GarageClaw GUI development server port */
-  CLAWX_DEV: 5173,
-  
+  GARAGECLAW_DEV: 5173,
+
   /** GarageClaw GUI production port (for reference) */
-  CLAWX_GUI: 23333,
+  GARAGECLAW_GUI: 23333,
 
   /** Local host API server port */
-  CLAWX_HOST_API: 3210,
+  GARAGECLAW_HOST_API: 3210,
   
   /** OpenClaw Gateway port */
   OPENCLAW_GATEWAY: 18789,
@@ -24,7 +24,7 @@ export const PORTS = {
  * Get port from environment or default
  */
 export function getPort(key: keyof typeof PORTS): number {
-  const envKey = `CLAWX_PORT_${key}`;
+  const envKey = `GARAGECLAW_PORT_${key}`;
   const envValue = process.env[envKey];
   return envValue ? parseInt(envValue, 10) : PORTS[key];
 }
@@ -37,7 +37,7 @@ export const APP_PATHS = {
   OPENCLAW_CONFIG: '~/.openclaw',
   
   /** GarageClaw configuration directory */
-  CLAWX_CONFIG: '~/.garageclaw',
+  GARAGECLAW_CONFIG: '~/.garageclaw',
   
   /** Log files directory */
   LOGS: '~/.garageclaw/logs',

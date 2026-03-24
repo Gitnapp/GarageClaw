@@ -1,3 +1,5 @@
+import type { DetailedHTMLProps, HTMLAttributes } from 'react';
+
 /**
  * Electron API Type Declarations
  * Types for the APIs exposed via contextBridge
@@ -17,9 +19,31 @@ export interface ElectronAPI {
   isDev: boolean;
 }
 
+export interface ElectronWebviewElement extends HTMLElement {
+  canGoBack: () => boolean;
+  canGoForward: () => boolean;
+  goBack: () => void;
+  goForward: () => void;
+  loadURL: (url: string) => void;
+  reload: () => void;
+  stop: () => void;
+  getURL: () => string;
+}
+
 declare global {
   interface Window {
     electron: ElectronAPI;
+  }
+
+  namespace JSX {
+    interface IntrinsicElements {
+      webview: DetailedHTMLProps<HTMLAttributes<ElectronWebviewElement>, ElectronWebviewElement> & {
+        allowpopups?: string;
+        partition?: string;
+        src?: string;
+        webpreferences?: string;
+      };
+    }
   }
 }
 

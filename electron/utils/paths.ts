@@ -43,7 +43,7 @@ export function getOpenClawSkillsDir(): string {
 /**
  * Get GarageClaw config directory
  */
-export function getClawXConfigDir(): string {
+export function getGarageClawConfigDir(): string {
   return join(homedir(), '.garageclaw');
 }
 

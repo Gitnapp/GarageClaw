@@ -1,8 +1,12 @@
 {
     "steps": {
         "welcome": {
-            "title": "Welcome to ClawX",
+            "title": "Welcome to GarageClaw",
             "description": "Your AI assistant is ready to be configured"
+        },
+        "login": {
+            "title": "Sign In",
+            "description": "Sign in or create your GarageClaw platform account"
         },
         "runtime": {
             "title": "Environment Check",
@@ -22,12 +26,12 @@
         },
         "complete": {
             "title": "All Set!",
-            "description": "ClawX is ready to use"
+            "description": "GarageClaw is ready to use"
         }
     },
     "welcome": {
-        "title": "Welcome to ClawX",
-        "description": "ClawX is a graphical interface for OpenClaw, making it easy to use AI assistants across your favorite messaging platforms.",
+        "title": "Welcome to GarageClaw",
+        "description": "GarageClaw is a graphical interface for OpenClaw, making it easy to use AI assistants across your favorite messaging platforms.",
         "features": {
             "noCommand": "Zero command-line required",
             "modernUI": "Modern, beautiful interface",
@@ -67,6 +71,11 @@
         "baseUrl": "Base URL",
         "modelId": "Model ID",
         "modelIdDesc": "The model identifier from your provider (e.g. deepseek-ai/DeepSeek-V3)",
+        "codePlanPreset": "Code Plan Preset",
+        "codePlanMode": "Code Plan",
+        "useCodePlanPreset": "Use Ark Code Plan Preset",
+        "codePlanPresetDesc": "Code Plan uses https://ark.cn-beijing.volces.com/api/coding/v3 and model ark-code-latest. Do not use /api/v3 for Code Plan traffic.",
+        "codePlanDoc": "Code Plan docs",
         "protocol": "Protocol",
         "protocols": {
             "openaiCompletions": "OpenAI Completions",
@@ -108,7 +117,7 @@
     },
     "complete": {
         "title": "Setup Complete!",
-        "subtitle": "ClawX is configured and ready to use. You can now start chatting with your AI assistant.",
+        "subtitle": "GarageClaw is configured and ready to use. You can now start chatting with your AI assistant.",
         "provider": "AI Provider",
         "components": "Components",
         "gateway": "Gateway",

@@ -1,8 +1,12 @@
 {
     "steps": {
         "welcome": {
-            "title": "欢迎使用 ClawX",
+            "title": "欢迎使用 GarageClaw",
             "description": "您的 AI 助手已准备好进行配置"
+        },
+        "login": {
+            "title": "登录平台",
+            "description": "登录或注册你的 GarageClaw 平台账号"
         },
         "runtime": {
             "title": "环境检查",
@@ -22,12 +26,12 @@
         },
         "complete": {
             "title": "准备就绪！",
-            "description": "ClawX 已准备好使用"
+            "description": "GarageClaw 已准备好使用"
         }
     },
     "welcome": {
-        "title": "欢迎使用 ClawX",
-        "description": "ClawX 是 OpenClaw 的图形界面，让您可以在喜爱的消息平台上轻松使用 AI 助手。",
+        "title": "欢迎使用 GarageClaw",
+        "description": "GarageClaw 是 OpenClaw 的图形界面，让您可以在喜爱的消息平台上轻松使用 AI 助手。",
         "features": {
             "noCommand": "无需命令行",
             "modernUI": "现代美观的界面",
@@ -67,6 +71,11 @@
         "baseUrl": "基础 URL",
         "modelId": "模型 ID",
         "modelIdDesc": "提供商的模型标识符（例如 deepseek-ai/DeepSeek-V3）",
+        "codePlanPreset": "Code Plan 预设",
+        "codePlanMode": "Code Plan",
+        "useCodePlanPreset": "使用 Ark Code Plan 预设",
+        "codePlanPresetDesc": "Code Plan 使用 https://ark.cn-beijing.volces.com/api/coding/v3 与模型 ark-code-latest。请勿把 /api/v3 用于 Code Plan 流量。",
+        "codePlanDoc": "Code Plan 文档",
         "protocol": "协议",
         "protocols": {
             "openaiCompletions": "OpenAI Completions",
@@ -108,7 +117,7 @@
     },
     "complete": {
         "title": "设置完成！",
-        "subtitle": "ClawX 已配置并准备就绪。您现在可以开始与您的 AI 助手聊天了。",
+        "subtitle": "GarageClaw 已配置并准备就绪。您现在可以开始与您的 AI 助手聊天了。",
         "provider": "AI 提供商",
         "components": "组件",
         "gateway": "网关",

@@ -55,7 +55,7 @@ publish:
     useMultipleRangeRequest: false
   - provider: github
     owner: Gitnapp
-    repo: ClawX
+    repo: GarageClaw
 
 # macOS Configuration
 mac:

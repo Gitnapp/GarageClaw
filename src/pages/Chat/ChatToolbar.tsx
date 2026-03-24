@@ -68,6 +68,7 @@ export function ChatToolbar() {
           <p>{showThinking ? t('toolbar.hideThinking') : t('toolbar.showThinking')}</p>
         </TooltipContent>
       </Tooltip>
+
     </div>
   );
 }

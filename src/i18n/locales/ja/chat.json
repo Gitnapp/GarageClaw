@@ -2,7 +2,7 @@
     "gatewayNotRunning": "ゲートウェイが停止中",
     "gatewayRequired": "チャットを利用するには OpenClaw ゲートウェイが実行されている必要があります。自動的に起動するか、設定から起動できます。",
     "welcome": {
-        "title": "ClawX チャット",
+        "title": "GarageClaw チャット",
         "subtitle": "お手伝いできることはありますか？",
         "askQuestions": "タスク対応",
         "askQuestionsDesc": "タスク指向の依頼に対応します",
@@ -15,7 +15,8 @@
         "refresh": "チャットを更新",
         "showThinking": "思考を表示",
         "hideThinking": "思考を非表示",
-        "currentAgent": "現在の会話相手: {{agent}}"
+        "currentAgent": "現在の会話相手: {{agent}}",
+        "marketplace": "マーケットプレイスを開く"
     },
     "composer": {
         "attachFiles": "ファイルを添付",
