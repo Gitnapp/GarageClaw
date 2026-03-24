@@ -216,7 +216,8 @@ export function ProvidersSettings() {
   const vendorMap = new Map(vendors.map((vendor) => [vendor.id, vendor]));
   const existingVendorIds = new Set(accounts.map((account) => account.vendorId));
   const displayProviders = useMemo(
-    () => buildProviderListItems(accounts, statuses, vendors, defaultAccountId),
+    () => buildProviderListItems(accounts, statuses, vendors, defaultAccountId)
+      .filter((item) => item.account.vendorId === 'garageclaw-platform'),
     [accounts, statuses, vendors, defaultAccountId],
   );
 
@@ -292,10 +293,7 @@ export function ProvidersSettings() {
         <h2 className="text-3xl font-serif text-foreground font-normal tracking-tight" style={{ fontFamily: 'Georgia, Cambria, "Times New Roman", Times, serif' }}>
           {t('aiProviders.title', 'AI Providers')}
         </h2>
-        <Button onClick={() => setShowAddDialog(true)} className="rounded-full px-5 h-9 shadow-none font-medium text-[13px]">
-          <Plus className="h-4 w-4 mr-2" />
-          {t('aiProviders.add')}
-        </Button>
+        {/* Add provider button hidden — platform provider is auto-configured */}
       </div>
 
       {loading ? (
@@ -309,10 +307,7 @@ export function ProvidersSettings() {
           <p className="text-[13px] text-center mb-6 max-w-sm">
             {t('aiProviders.empty.desc')}
           </p>
-          <Button onClick={() => setShowAddDialog(true)} className="rounded-full px-6 h-10 bg-[#0a84ff] hover:bg-[#007aff] text-white">
-            <Plus className="h-4 w-4 mr-2" />
-            {t('aiProviders.empty.cta')}
-          </Button>
+          <p className="text-sm text-muted-foreground">{t('aiProviders.empty.platformHint', '请先在账号页面登录平台')}</p>
         </div>
       ) : (
         <div className="space-y-3">
