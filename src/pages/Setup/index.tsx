@@ -435,24 +435,19 @@ function LoginContent({ onLoginComplete }: LoginContentProps) {
       await loadProfile();
       await ensureLitellmKey();
 
-      // Assign initial credits for new users via LiteLLM management API
+      // Assign initial credits for new users via SECURITY DEFINER RPC + LiteLLM management API
       try {
         const { supabase } = await import('@/lib/supabase');
         const { data: { user: currentUser } } = await supabase.auth.getUser();
         if (currentUser) {
-          // Check if user already has credits (not a new user)
-          const { data: balance } = await supabase.rpc('get_balance', { p_user_id: currentUser.id });
-          if (typeof balance === 'number' && balance <= 0) {
-            // Grant initial credits in Supabase
-            await supabase.from('credit_ledger').insert({
-              user_id: currentUser.id,
-              type: 'topup',
-              amount: INITIAL_CREDITS,
-              balance_after: INITIAL_CREDITS,
-              description: 'Welcome bonus credits',
-            });
+          const { data: result } = await supabase.rpc('grant_welcome_credits', {
+            p_user_id: currentUser.id,
+            p_amount: INITIAL_CREDITS,
+          });
 
-            // Update LiteLLM virtual key budget
+          const granted = result && typeof result === 'object' && 'granted' in result && result.granted;
+          if (granted) {
+            // Update LiteLLM virtual key budget to match new balance
             const { litellmKey } = usePlatformStore.getState();
             if (litellmKey) {
               await fetch(`${LITELLM_PROXY_URL}/key/update`, {
@@ -468,9 +463,11 @@ function LoginContent({ onLoginComplete }: LoginContentProps) {
               });
             }
           }
+
+          // Refresh profile to show updated balance
+          await loadProfile();
         }
       } catch {
-        // Non-critical: credits assignment failed, continue anyway
         console.error('[Setup] Failed to assign initial credits');
       }
 
