@@ -1,11 +1,13 @@
 import { create } from 'zustand';
 import type { User } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
+import { hostApiFetch } from '@/lib/host-api';
 
 // ── Constants ──
 
 const LITELLM_PROXY_URL = 'https://garage-litellm.fly.dev';
 const LITELLM_MASTER_KEY = 'garage';
+const PLATFORM_PROVIDER_ACCOUNT_ID = 'garageclaw-platform-default';
 
 // ── Types (inline, matching Supabase tables) ──
 
@@ -53,6 +55,7 @@ interface PlatformState {
   profile: ProfileRow | null;
   balance: number;
   litellmKey: string | null;
+  availableModels: string[];
   history: CreditLedgerRow[];
   agents: AgentRow[];
   skills: SkillRow[];
@@ -64,6 +67,7 @@ interface PlatformState {
   loadCredits: () => Promise<void>;
   loadMarketplace: () => Promise<void>;
   ensureLitellmKey: () => Promise<void>;
+  loadAvailableModels: () => Promise<void>;
 }
 
 async function createLitellmVirtualKey(userId: string, maxBudget: number): Promise<string | null> {
@@ -89,12 +93,84 @@ async function createLitellmVirtualKey(userId: string, maxBudget: number): Promi
   }
 }
 
+async function fetchLitellmModels(): Promise<string[]> {
+  try {
+    const response = await fetch(`${LITELLM_PROXY_URL}/models`, {
+      headers: { 'Authorization': `Bearer ${LITELLM_MASTER_KEY}` },
+    });
+    if (!response.ok) return [];
+    const data = await response.json() as { data?: Array<{ id: string }> };
+    return (data.data ?? []).map((m) => m.id);
+  } catch {
+    return [];
+  }
+}
+
+async function registerPlatformProvider(apiKey: string, model: string): Promise<void> {
+  try {
+    // Check if already registered
+    const snapshot = await hostApiFetch<{
+      success: boolean;
+      accounts?: Array<{ id: string }>;
+    }>('/api/provider-accounts');
+
+    const exists = snapshot.accounts?.some((a) => a.id === PLATFORM_PROVIDER_ACCOUNT_ID);
+    if (exists) {
+      // Update key in case it changed
+      await hostApiFetch('/api/provider-accounts/' + encodeURIComponent(PLATFORM_PROVIDER_ACCOUNT_ID), {
+        method: 'PUT',
+        body: JSON.stringify({
+          account: {
+            id: PLATFORM_PROVIDER_ACCOUNT_ID,
+            vendorId: 'garageclaw-platform',
+            label: 'GarageClaw Platform',
+            authMode: 'api_key',
+            model,
+            enabled: true,
+            isDefault: true,
+          },
+          apiKey,
+        }),
+      });
+      return;
+    }
+
+    // Create new account
+    await hostApiFetch('/api/provider-accounts', {
+      method: 'POST',
+      body: JSON.stringify({
+        account: {
+          id: PLATFORM_PROVIDER_ACCOUNT_ID,
+          vendorId: 'garageclaw-platform',
+          label: 'GarageClaw Platform',
+          authMode: 'api_key',
+          model,
+          enabled: true,
+          isDefault: true,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        },
+        apiKey,
+      }),
+    });
+
+    // Set as default provider
+    await hostApiFetch('/api/provider-accounts/default', {
+      method: 'PUT',
+      body: JSON.stringify({ accountId: PLATFORM_PROVIDER_ACCOUNT_ID }),
+    });
+  } catch (error) {
+    console.error('[Platform] Failed to register provider:', error);
+  }
+}
+
 export const usePlatformStore = create<PlatformState>((set, get) => ({
   user: null,
   loading: true,
   profile: null,
   balance: 0,
   litellmKey: null,
+  availableModels: [],
   history: [],
   agents: [],
   skills: [],
@@ -104,7 +180,10 @@ export const usePlatformStore = create<PlatformState>((set, get) => ({
     supabase.auth.getUser().then(({ data: { user } }) => {
       set({ user, loading: false });
       if (user) {
-        get().loadProfile().then(() => get().ensureLitellmKey());
+        get().loadProfile().then(async () => {
+          await get().ensureLitellmKey();
+          get().loadAvailableModels();
+        });
       }
     });
 
@@ -113,7 +192,7 @@ export const usePlatformStore = create<PlatformState>((set, get) => ({
       const user = session?.user ?? null;
       set({ user, loading: false });
       if (!user) {
-        set({ profile: null, balance: 0, litellmKey: null, history: [] });
+        set({ profile: null, balance: 0, litellmKey: null, availableModels: [], history: [] });
       }
     });
   },
@@ -130,39 +209,50 @@ export const usePlatformStore = create<PlatformState>((set, get) => ({
     if (user) {
       await get().loadProfile();
       await get().ensureLitellmKey();
+      get().loadAvailableModels();
     }
     return null;
   },
 
   signOut: async () => {
     await supabase.auth.signOut();
-    set({ user: null, profile: null, balance: 0, litellmKey: null, history: [] });
+    set({ user: null, profile: null, balance: 0, litellmKey: null, availableModels: [], history: [] });
   },
 
   ensureLitellmKey: async () => {
     const { user, profile, balance } = get();
     if (!user || !profile) return;
 
-    // Already have a key
-    if (profile.litellm_key) {
-      set({ litellmKey: profile.litellm_key });
-      return;
+    let key = profile.litellm_key;
+
+    if (!key) {
+      // Create new virtual key
+      key = await createLitellmVirtualKey(user.id, balance);
+      if (!key) return;
+
+      // Save to Supabase
+      await supabase
+        .from('profiles')
+        .update({ litellm_key: key })
+        .eq('id', user.id);
+
+      set({
+        litellmKey: key,
+        profile: { ...profile, litellm_key: key },
+      });
+    } else {
+      set({ litellmKey: key });
     }
 
-    // Create new virtual key
-    const key = await createLitellmVirtualKey(user.id, balance);
-    if (!key) return;
+    // Auto-register provider with the key
+    const models = await fetchLitellmModels();
+    const defaultModel = models[0] || 'gpt-4o';
+    await registerPlatformProvider(key, defaultModel);
+  },
 
-    // Save to Supabase
-    await supabase
-      .from('profiles')
-      .update({ litellm_key: key })
-      .eq('id', user.id);
-
-    set({
-      litellmKey: key,
-      profile: { ...profile, litellm_key: key },
-    });
+  loadAvailableModels: async () => {
+    const models = await fetchLitellmModels();
+    set({ availableModels: models });
   },
 
   loadProfile: async () => {

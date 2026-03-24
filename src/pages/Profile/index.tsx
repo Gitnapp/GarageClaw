@@ -81,6 +81,7 @@ function ProfileView() {
   const balance = usePlatformStore((s) => s.balance);
   const history = usePlatformStore((s) => s.history);
   const litellmKey = usePlatformStore((s) => s.litellmKey);
+  const availableModels = usePlatformStore((s) => s.availableModels);
   const signOut = usePlatformStore((s) => s.signOut);
   const loadProfile = usePlatformStore((s) => s.loadProfile);
   const loadCredits = usePlatformStore((s) => s.loadCredits);
@@ -92,9 +93,8 @@ function ProfileView() {
   const cards = [
     { label: 'Display Name', value: profile?.display_name ?? '未设置' },
     { label: 'Email', value: user?.email ?? '未设置' },
-    { label: 'Role', value: profile?.role ?? 'user' },
     { label: 'Credits', value: balance.toFixed(2) },
-    { label: 'Platform Key', value: litellmKey ? `${litellmKey.slice(0, 10)}...` : '未分配' },
+    { label: 'Provider', value: litellmKey ? '已配置' : '未配置' },
   ];
 
   return (
@@ -110,6 +110,23 @@ function ProfileView() {
           </div>
         ))}
       </div>
+
+      {/* Available models */}
+      {availableModels.length > 0 && (
+        <div className="rounded-lg border bg-card p-6 shadow-sm">
+          <h2 className="text-lg font-semibold">可用模型</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            以下模型由平台提供，登录后自动配置为默认 Provider
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {availableModels.map((model) => (
+              <span key={model} className="rounded-md border bg-background px-2.5 py-1 text-sm">
+                {model}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Credits history */}
       <div className="rounded-lg border bg-card p-6 shadow-sm">

@@ -170,7 +170,7 @@ export const PROVIDER_TYPE_INFO: ProviderTypeInfo[] = [
   { id: 'qwen-portal', name: 'Qwen (Global)', icon: '☁️', placeholder: 'sk-...', model: 'Qwen', requiresApiKey: false, isOAuth: true, defaultModelId: 'coder-model' },
   { id: 'ark', name: 'ByteDance Ark', icon: 'A', placeholder: 'your-ark-api-key', model: 'Doubao', requiresApiKey: true, defaultBaseUrl: 'https://ark.cn-beijing.volces.com/api/v3', showBaseUrl: true, showModelId: true, modelIdPlaceholder: 'ep-20260228000000-xxxxx', docsUrl: 'https://www.volcengine.com/', codePlanPresetBaseUrl: 'https://ark.cn-beijing.volces.com/api/coding/v3', codePlanPresetModelId: 'ark-code-latest', codePlanDocsUrl: 'https://www.volcengine.com/docs/82379/1928261?lang=zh' },
   { id: 'ollama', name: 'Ollama', icon: '🦙', placeholder: 'Not required', requiresApiKey: false, defaultBaseUrl: 'http://localhost:11434/v1', showBaseUrl: true, showModelId: true, modelIdPlaceholder: 'qwen3:latest' },
-  { id: 'garageclaw-platform', name: 'GarageClaw Platform', icon: '🏗️', placeholder: 'sk-...', model: 'Multi-Model', requiresApiKey: true, showModelId: true, modelIdPlaceholder: 'gpt-4o / claude-opus-4-6 / deepseek-chat', defaultModelId: 'gpt-4o' },
+  { id: 'garageclaw-platform', name: 'GarageClaw Platform', icon: '🏗️', placeholder: 'Auto-configured via Platform login', model: 'Multi-Model', requiresApiKey: true, showModelId: false, defaultModelId: 'gpt-4o' },
   {
     id: 'custom',
     name: 'Custom',
