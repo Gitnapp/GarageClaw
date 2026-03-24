@@ -3,30 +3,39 @@
 ## [2026-03-24] 平台集成 & LiteLLM 计费
 
 **改动文件：**
-- `src/stores/platform.ts` — 新建 Zustand platform store（auth、profile、balance、LiteLLM key、marketplace）
-- `src/lib/supabase.ts` — 新建 Supabase 客户端单例
-- `src/pages/Profile/index.tsx` — 新建 Profile 页（登录表单 + 用户信息 + credits 历史 + 可用模型）
-- `src/pages/Marketplace/index.tsx` — 新建 Marketplace 页（公开 agents/skills 列表）
-- `src/pages/Setup/index.tsx` — 添加 LOGIN 步骤到 onboarding，强制登录，自动分配赠金
-- `src/App.tsx` — 添加路由、auth 初始化、未登录强制跳转 onboarding
+- `src/stores/platform.ts` — Zustand platform store（auth、profile、balance、LiteLLM key、可用模型、marketplace）
+- `src/lib/supabase.ts` — Supabase 客户端单例
+- `src/pages/Profile/index.tsx` — Profile 页（登录/用户信息/credits 历史/可用模型展示）
+- `src/pages/Marketplace/index.tsx` — Marketplace 页（公开 agents/skills）
+- `src/pages/Setup/index.tsx` — Onboarding 添加登录步骤，合并登录注册为单一入口，自动分配 $20 赠金
+- `src/App.tsx` — 路由、auth 初始化、未登录强制跳转 onboarding
 - `src/components/layout/Sidebar.tsx` — 添加 Marketplace/Profile 导航
+- `src/components/settings/ProvidersSettings.tsx` — 隐藏添加提供商按钮，只显示 GarageClaw Platform，模型选择改为下拉菜单
 - `electron/shared/providers/registry.ts` — 添加 GarageClaw Platform 内置 provider
 - `electron/shared/providers/types.ts` — 添加 garageclaw-platform 类型
 - `src/lib/providers.ts` — 前端 provider 列表添加 GarageClaw Platform
 - `electron/main/ipc/host-api-proxy.ts` — 修复 PORTS.CLAWX_HOST_API → GARAGECLAW_HOST_API
 - `package.json` — 添加 @supabase/supabase-js 依赖
 - `pnpm-workspace.yaml` — 还原为单根目录（移除 apps/\* packages/\*）
+- `src/i18n/locales/{en,zh,ja}/setup.json` — 添加 login 步骤 i18n
 - `docs/plans/2026-03-24-litellm-billing-design.md` — LiteLLM 计费集成设计文档
-- Supabase migration: profiles.litellm_key 字段、\_spend_sync_state 表、credit_ledger.request_id 去重索引、grant_welcome_credits RPC
-- Supabase Edge Function: sync-litellm-spend（每分钟同步 LiteLLM SpendLogs → credit_ledger）
+- Supabase migration: profiles.litellm_key、\_spend_sync_state 表、credit_ledger.request_id 去重索引、grant_welcome_credits RPC、get_balance 改为 SECURITY DEFINER
+- Supabase Edge Function: sync-litellm-spend v2（每分钟全量同步 LiteLLM SpendLogs → credit_ledger，靠 request_id 去重）
 
 **变更说明：**
 
-1. **Supabase 原生集成** — 在 renderer 直接使用 supabase-js，auth session 通过 localStorage 持久化，不经过 main 进程
-2. **LiteLLM 计费** — 用户登录时自动创建 LiteLLM virtual key 并注册为默认 provider，LiteLLM 内置 budget 拦截防超额，Edge Function 定时同步 spend 到 credit_ledger
-3. **Onboarding 强制登录** — 新增 LOGIN 步骤，新用户自动获得 1.0 credits 欢迎赠金（通过 SECURITY DEFINER RPC 绕过 RLS）
-4. **Web 服务独立** — apps/web 抽取到独立仓库 GarageClaw-Web，desktop 移除 webview 嵌入方式
-5. **Bug 修复** — host-api-proxy 端口常量名从品牌重命名中遗漏导致 Gateway 状态显示 error
+1. **Supabase 原生集成** — renderer 直接使用 supabase-js，auth session 通过 localStorage 持久化，不经过 main 进程
+2. **LiteLLM 计费** — 登录时自动创建 LiteLLM virtual key 并注册为默认 provider，LiteLLM 内置 budget 拦截防超额，Edge Function 每分钟同步 spend 到 credit_ledger
+3. **Onboarding 强制登录** — 新增 LOGIN 步骤，合并登录/注册为单一入口（先尝试登录，不存在则注册），邮件确认提示用友好蓝色样式，新用户获 $20 欢迎赠金
+4. **退出登录保护** — 退出后自动跳回 onboarding 登录页，跳过 Welcome 直达 LOGIN 步骤
+5. **Provider 配置锁定** — 隐藏添加提供商按钮，只显示 GarageClaw Platform，模型选择从自由输入改为 LiteLLM 可用模型下拉菜单
+6. **Web 服务独立** — apps/web 抽取到独立仓库 GarageClaw-Web，desktop 移除 webview 嵌入方式
+7. **Bug 修复**
+   - host-api-proxy 端口常量名遗漏导致 Gateway 状态显示 error
+   - credit_ledger 缺少 INSERT RLS 策略，赠金静默失败 → 改用 SECURITY DEFINER RPC
+   - get_balance 函数非 SECURITY DEFINER，客户端查余额返回 0 → 修复
+   - LiteLLM virtual key 创建时 budget=0（赠金在 key 创建后才分配）→ 调整为先赠金再建 key，且每次登录自动同步 budget
+   - Edge Function spend sync 日期格式不兼容 LiteLLM API → 改为全量获取 + request_id 去重
 
 **影响范围：**
 前端 / Electron 主进程 / Supabase 数据库 / Supabase Edge Functions / LiteLLM proxy
