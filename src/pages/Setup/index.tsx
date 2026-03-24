@@ -131,7 +131,9 @@ function getProtocolBaseUrlPlaceholder(
 export function Setup() {
   const { t } = useTranslation(['setup', 'channels']);
   const navigate = useNavigate();
-  const [currentStep, setCurrentStep] = useState<number>(STEP.WELCOME);
+  const setupComplete = useSettingsStore((state) => state.setupComplete);
+  // If setup was already complete (user logged out), skip to LOGIN step
+  const [currentStep, setCurrentStep] = useState<number>(setupComplete ? STEP.LOGIN : STEP.WELCOME);
 
   // Setup state
   const [selectedProvider, setSelectedProvider] = useState<string | null>(null);

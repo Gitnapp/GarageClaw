@@ -127,12 +127,18 @@ function App() {
     initProviders();
   }, [initProviders]);
 
-  // Redirect to setup wizard if not complete
+  // Redirect to setup wizard if not complete or not logged in
+  const platformUser = usePlatformStore((state) => state.user);
+  const platformLoading = usePlatformStore((state) => state.loading);
+
   useEffect(() => {
+    if (platformLoading) return;
     if (!setupComplete && !location.pathname.startsWith('/setup')) {
       navigate('/setup');
+    } else if (setupComplete && !platformUser && !location.pathname.startsWith('/setup')) {
+      navigate('/setup');
     }
-  }, [setupComplete, location.pathname, navigate]);
+  }, [setupComplete, platformUser, platformLoading, location.pathname, navigate]);
 
   // Listen for navigation events from main process
   useEffect(() => {
