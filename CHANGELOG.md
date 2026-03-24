@@ -1,5 +1,21 @@
 # Changelog
 
+## [2026-03-24] CI/CD 自动发布
+
+**改动文件：**
+- `.github/workflows/release.yml` — 添加 push to main 自动触发、auto-tag job、跳过签名、禁用 fail-fast
+
+**变更说明：**
+- 推送到 main 自动从 package.json 读取版本号，创建 git tag，触发三平台构建并发布 GitHub Release + OSS
+- macOS 未配证书时跳过签名（`CSC_IDENTITY_AUTO_DISCOVERY=false`），避免构建崩溃
+- `fail-fast: false` 使 Linux/Windows 构建不受 macOS 失败影响
+- 保留 tag 推送和 workflow_dispatch 手动触发方式
+
+**影响范围：**
+CI/CD
+
+---
+
 ## [2026-03-24] 平台集成 & LiteLLM 计费
 
 **改动文件：**
