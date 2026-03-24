@@ -178,6 +178,7 @@ const electronAPI = {
         'oauth:success',
         'oauth:error',
         'openclaw:cli-installed',
+        'auth:deep-link',
       ];
 
       if (validChannels.includes(channel)) {

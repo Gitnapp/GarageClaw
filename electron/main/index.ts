@@ -62,6 +62,51 @@ const WINDOWS_APP_USER_MODEL_ID = 'app.garageclaw.desktop';
 // set `"disable-hardware-acceleration": false` in the app config (future).
 app.disableHardwareAcceleration();
 
+// Register garageclaw:// custom protocol for Supabase email verification deep links.
+// Must be called before app.isReady(). On macOS the protocol is handled by Info.plist
+// in packaged builds; setAsDefaultProtocolClient is a no-op there but needed for dev.
+// On Windows/Linux this registers the protocol handler in the OS.
+const PROTOCOL_SCHEME = 'garageclaw';
+if (!app.isDefaultProtocolClient(PROTOCOL_SCHEME)) {
+  app.setAsDefaultProtocolClient(PROTOCOL_SCHEME);
+}
+
+// Pending deep link URL received before the main window was ready.
+let pendingDeepLinkUrl: string | null = null;
+
+/**
+ * Handle a garageclaw:// deep link URL.
+ * Extracts auth tokens from the hash fragment and sends them to the renderer.
+ */
+function handleDeepLink(url: string): void {
+  if (!url.startsWith(`${PROTOCOL_SCHEME}://auth/callback`)) return;
+
+  // The hash fragment contains access_token, refresh_token, etc.
+  const hashIndex = url.indexOf('#');
+  if (hashIndex === -1) return;
+
+  const fragment = url.slice(hashIndex + 1);
+  const params = new URLSearchParams(fragment);
+  const accessToken = params.get('access_token');
+  const refreshToken = params.get('refresh_token');
+
+  if (!accessToken || !refreshToken) return;
+
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('auth:deep-link', { accessToken, refreshToken });
+    focusMainWindow();
+  } else {
+    // Window not ready yet — store for later delivery
+    pendingDeepLinkUrl = url;
+  }
+}
+
+// On macOS, open-url fires when the OS routes a garageclaw:// URL to the app.
+app.on('open-url', (event, url) => {
+  event.preventDefault();
+  handleDeepLink(url);
+});
+
 // On Linux, set CHROME_DESKTOP so Chromium can find the correct .desktop file.
 // On Wayland this maps the running window to garageclaw.desktop (→ icon + app grouping);
 // on X11 it supplements the StartupWMClass matching.
@@ -224,6 +269,12 @@ function createMainWindow(): BrowserWindow {
     }
 
     win.show();
+
+    // Deliver any deep link that arrived before the window was ready
+    if (pendingDeepLinkUrl) {
+      handleDeepLink(pendingDeepLinkUrl);
+      pendingDeepLinkUrl = null;
+    }
   });
 
   win.on('close', (event) => {
@@ -473,8 +524,16 @@ if (gotTheLock) {
   hostEventBus = new HostEventBus();
 
   // When a second instance is launched, focus the existing window instead.
-  app.on('second-instance', () => {
+  // On Windows/Linux, deep link URLs arrive as command-line args in the second instance.
+  app.on('second-instance', (_event, argv) => {
     logger.info('Second GarageClaw instance detected; redirecting to the existing window');
+
+    // Check for deep link URL in argv (Windows/Linux)
+    const deepLinkUrl = argv.find((arg) => arg.startsWith(`${PROTOCOL_SCHEME}://`));
+    if (deepLinkUrl) {
+      handleDeepLink(deepLinkUrl);
+      return;
+    }
 
     const focusRequest = requestSecondInstanceFocus(
       mainWindowFocusState,

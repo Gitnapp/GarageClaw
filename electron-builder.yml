@@ -35,6 +35,13 @@ extraResources:
 
 afterPack: ./scripts/after-pack.cjs
 
+# Custom URL protocol for Supabase email verification deep links.
+# Registers garageclaw:// so the OS routes callback URLs to the app.
+protocols:
+  - name: GarageClaw
+    schemes:
+      - garageclaw
+
 asar: true
 asarUnpack:
   - "**/*.node"

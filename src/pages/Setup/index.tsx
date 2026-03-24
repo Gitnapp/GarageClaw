@@ -440,7 +440,13 @@ function LoginContent({ onLoginComplete }: LoginContentProps) {
 
       // If login failed, try to register
       const { supabase } = await import('@/lib/supabase');
-      const { error: signUpError } = await supabase.auth.signUp({ email, password });
+      const { error: signUpError } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          emailRedirectTo: 'https://garageclaw-web.vercel.app/auth/callback',
+        },
+      });
       if (signUpError) {
         setError(signUpError.message);
         return;

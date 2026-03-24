@@ -193,8 +193,26 @@ export const usePlatformStore = create<PlatformState>((set, get) => ({
       set({ user, loading: false });
       if (!user) {
         set({ profile: null, balance: 0, litellmKey: null, availableModels: [], history: [] });
+      } else if (_event === 'SIGNED_IN' || _event === 'TOKEN_REFRESHED') {
+        get().loadProfile().then(async () => {
+          await get().ensureLitellmKey();
+          get().loadAvailableModels();
+        });
       }
     });
+
+    // Listen for deep link auth tokens from Electron main process
+    // (sent when user clicks email verification link → web callback → garageclaw:// protocol)
+    if (window.electron?.ipcRenderer?.on) {
+      window.electron.ipcRenderer.on('auth:deep-link', (...args: unknown[]) => {
+        const payload = args[0] as { accessToken: string; refreshToken: string } | undefined;
+        if (!payload?.accessToken || !payload?.refreshToken) return;
+        supabase.auth.setSession({
+          access_token: payload.accessToken,
+          refresh_token: payload.refreshToken,
+        });
+      });
+    }
   },
 
   signIn: async (email, password) => {
