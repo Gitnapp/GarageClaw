@@ -1,5 +1,24 @@
 # Changelog
 
+## [2026-03-25] Supabase 邮箱验证 Deep Link 支持
+
+**改动文件：**
+- `electron-builder.yml` — 注册 `garageclaw://` 自定义协议
+- `electron/main/index.ts` — 协议处理：open-url (macOS)、second-instance argv (Windows/Linux)、pending URL 队列
+- `electron/preload/index.ts` — 白名单添加 `auth:deep-link` IPC 通道
+- `src/stores/platform.ts` — 监听 deep link IPC，调用 `supabase.auth.setSession()` 完成登录
+- `src/pages/Setup/index.tsx` — signUp 添加 `emailRedirectTo` 指向 Web 中转页
+
+**变更说明：**
+编译后的 Electron 应用无法接收 Supabase 默认的 localhost 回调，导致邮箱验证后无法完成注册登录。
+方案：注册 `garageclaw://` 自定义协议，Supabase 验证邮件重定向到 `garageclaw-web.vercel.app/auth/callback`（Web 中转页），
+中转页将 hash 中的 token 转发到 `garageclaw://auth/callback#access_token=...`，Electron 捕获后完成 session 设置。
+
+**影响范围：**
+前端 / Electron Main / 打包配置
+
+---
+
 ## [2026-03-24] CI/CD 自动发布
 
 **改动文件：**
