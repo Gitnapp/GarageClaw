@@ -47,6 +47,7 @@ import {
 } from '@/lib/provider-accounts';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { usePlatformStore } from '@/stores/platform';
 import { useTranslation } from 'react-i18next';
 import { invokeIpc } from '@/lib/api-client';
 import { useSettingsStore } from '@/stores/settings';
@@ -145,6 +146,52 @@ function getAuthModeLabel(
     default:
       return authMode;
   }
+}
+
+function PlatformModelSelect({
+  value,
+  onChange,
+  className,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  className?: string;
+}) {
+  const availableModels = usePlatformStore((s) => s.availableModels);
+  const loadAvailableModels = usePlatformStore((s) => s.loadAvailableModels);
+
+  useEffect(() => {
+    if (availableModels.length === 0) {
+      loadAvailableModels();
+    }
+  }, [availableModels.length, loadAvailableModels]);
+
+  if (availableModels.length === 0) {
+    return (
+      <Input
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder="Loading models..."
+        className={className}
+      />
+    );
+  }
+
+  return (
+    <select
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      className={cn(
+        'flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+        className,
+      )}
+    >
+      <option value="">Select a model</option>
+      {availableModels.map((model) => (
+        <option key={model} value={model}>{model}</option>
+      ))}
+    </select>
+  );
 }
 
 export function ProvidersSettings() {
@@ -633,12 +680,16 @@ function ProviderCard({
               {showModelIdField && (
                 <div className="space-y-1.5 pt-2">
                   <Label className={currentLabelClasses}>{t('aiProviders.dialog.modelId')}</Label>
-                  <Input
-                    value={modelId}
-                    onChange={(e) => setModelId(e.target.value)}
-                    placeholder={typeInfo?.modelIdPlaceholder || 'provider/model-id'}
-                    className={currentInputClasses}
-                  />
+                  {account.vendorId === 'garageclaw-platform' ? (
+                    <PlatformModelSelect value={modelId} onChange={setModelId} className={currentInputClasses} />
+                  ) : (
+                    <Input
+                      value={modelId}
+                      onChange={(e) => setModelId(e.target.value)}
+                      placeholder={typeInfo?.modelIdPlaceholder || 'provider/model-id'}
+                      className={currentInputClasses}
+                    />
+                  )}
                 </div>
               )}
               {account.vendorId === 'ark' && codePlanPreset && (
@@ -1391,16 +1442,24 @@ function AddProviderDialog({
                 {showModelIdField && (
                   <div className="space-y-2.5">
                     <Label htmlFor="modelId" className={labelClasses}>{t('aiProviders.dialog.modelId')}</Label>
-                    <Input
-                      id="modelId"
-                      placeholder={typeInfo?.modelIdPlaceholder || 'provider/model-id'}
-                      value={modelId}
-                      onChange={(e) => {
-                        setModelId(e.target.value);
-                        setValidationError(null);
-                      }}
-                      className={inputClasses}
-                    />
+                    {selectedType === 'garageclaw-platform' ? (
+                      <PlatformModelSelect
+                        value={modelId}
+                        onChange={(v) => { setModelId(v); setValidationError(null); }}
+                        className={inputClasses}
+                      />
+                    ) : (
+                      <Input
+                        id="modelId"
+                        placeholder={typeInfo?.modelIdPlaceholder || 'provider/model-id'}
+                        value={modelId}
+                        onChange={(e) => {
+                          setModelId(e.target.value);
+                          setValidationError(null);
+                        }}
+                        className={inputClasses}
+                      />
+                    )}
                   </div>
                 )}
                 {selectedType === 'ark' && codePlanPreset && (

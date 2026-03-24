@@ -266,7 +266,7 @@ export const PROVIDER_DEFINITIONS: ProviderDefinition[] = [
     envVar: 'GARAGECLAW_LITELLM_KEY',
     defaultModelId: 'gpt-4o',
     showBaseUrl: false,
-    showModelId: false,
+    showModelId: true,
     supportedAuthModes: ['api_key'],
     defaultAuthMode: 'api_key',
     supportsMultipleAccounts: false,
