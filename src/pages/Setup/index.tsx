@@ -402,40 +402,23 @@ function LoginContent({ onLoginComplete }: LoginContentProps) {
 
   const completeLogin = async () => {
     await loadProfile();
-    await ensureLitellmKey();
 
+    // Grant credits FIRST so ensureLitellmKey sees the correct balance
     try {
       const { supabase } = await import('@/lib/supabase');
       const { data: { user: currentUser } } = await supabase.auth.getUser();
       if (currentUser) {
-        const { data: result } = await supabase.rpc('grant_welcome_credits', {
+        await supabase.rpc('grant_welcome_credits', {
           p_user_id: currentUser.id,
           p_amount: INITIAL_CREDITS,
         });
-
-        const granted = result && typeof result === 'object' && 'granted' in result && result.granted;
-        if (granted) {
-          const { litellmKey } = usePlatformStore.getState();
-          if (litellmKey) {
-            await fetch(`${LITELLM_PROXY_URL}/key/update`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${LITELLM_MGMT_KEY}`,
-              },
-              body: JSON.stringify({
-                key: litellmKey,
-                max_budget: INITIAL_CREDITS,
-              }),
-            });
-          }
-        }
-
-        await loadProfile();
       }
     } catch {
       console.error('[Setup] Failed to assign initial credits');
     }
+
+    // Now create/sync LiteLLM key with correct budget
+    await ensureLitellmKey();
 
     setDone(true);
     onLoginComplete();

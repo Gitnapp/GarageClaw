@@ -220,14 +220,18 @@ export const usePlatformStore = create<PlatformState>((set, get) => ({
   },
 
   ensureLitellmKey: async () => {
-    const { user, profile, balance } = get();
+    const { user, profile } = get();
     if (!user || !profile) return;
+
+    // Re-read balance fresh (may have been updated by grant_welcome_credits)
+    const { data: freshBalance } = await supabase.rpc('get_balance', { p_user_id: user.id });
+    const budget = typeof freshBalance === 'number' ? freshBalance : 0;
 
     let key = profile.litellm_key;
 
     if (!key) {
-      // Create new virtual key
-      key = await createLitellmVirtualKey(user.id, balance);
+      // Create new virtual key with current balance as budget
+      key = await createLitellmVirtualKey(user.id, budget);
       if (!key) return;
 
       // Save to Supabase
@@ -238,10 +242,23 @@ export const usePlatformStore = create<PlatformState>((set, get) => ({
 
       set({
         litellmKey: key,
+        balance: budget,
         profile: { ...profile, litellm_key: key },
       });
     } else {
-      set({ litellmKey: key });
+      set({ litellmKey: key, balance: budget });
+
+      // Sync budget for existing key (may have changed since creation)
+      if (budget > 0) {
+        fetch(`${LITELLM_PROXY_URL}/key/update`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${LITELLM_MASTER_KEY}`,
+          },
+          body: JSON.stringify({ key, max_budget: budget }),
+        }).catch(() => {});
+      }
     }
 
     // Auto-register provider with the key
