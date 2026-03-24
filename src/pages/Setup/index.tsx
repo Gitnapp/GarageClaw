@@ -35,6 +35,7 @@ import { toast } from 'sonner';
 import { invokeIpc } from '@/lib/api-client';
 import { hostApiFetch } from '@/lib/host-api';
 import { subscribeHostEvent } from '@/lib/host-events';
+import { usePlatformStore } from '@/stores/platform';
 interface SetupStep {
   id: string;
   title: string;
@@ -43,8 +44,8 @@ interface SetupStep {
 
 const STEP = {
   WELCOME: 0,
-  RUNTIME: 1,
-  PROVIDER: 2,
+  LOGIN: 1,
+  RUNTIME: 2,
   INSTALLING: 3,
   COMPLETE: 4,
 } as const;
@@ -56,14 +57,14 @@ const getSteps = (t: TFunction): SetupStep[] => [
     description: t('steps.welcome.description'),
   },
   {
+    id: 'login',
+    title: t('steps.login.title', '登录平台'),
+    description: t('steps.login.description', '登录或注册你的 GarageClaw 平台账号'),
+  },
+  {
     id: 'runtime',
     title: t('steps.runtime.title'),
     description: t('steps.runtime.description'),
-  },
-  {
-    id: 'provider',
-    title: t('steps.provider.title'),
-    description: t('steps.provider.description'),
   },
   {
     id: 'installing',
@@ -140,6 +141,8 @@ export function Setup() {
   const [installedSkills, setInstalledSkills] = useState<string[]>([]);
   // Runtime check status
   const [runtimeChecksPassed, setRuntimeChecksPassed] = useState(false);
+  // Login state
+  const [loginComplete, setLoginComplete] = useState(false);
 
   const steps = getSteps(t);
   const safeStepIndex = Number.isInteger(currentStep)
@@ -156,10 +159,10 @@ export function Setup() {
     switch (safeStepIndex) {
       case STEP.WELCOME:
         return true;
+      case STEP.LOGIN:
+        return loginComplete;
       case STEP.RUNTIME:
         return runtimeChecksPassed;
-      case STEP.PROVIDER:
-        return providerConfigured;
       case STEP.INSTALLING:
         return false; // Cannot manually proceed, auto-proceeds when done
       case STEP.COMPLETE:
@@ -167,7 +170,7 @@ export function Setup() {
       default:
         return true;
     }
-  }, [safeStepIndex, providerConfigured, runtimeChecksPassed]);
+  }, [safeStepIndex, loginComplete, runtimeChecksPassed]);
 
   const handleNext = async () => {
     if (isLastStep) {
@@ -254,17 +257,8 @@ export function Setup() {
             {/* Step-specific content */}
             <div className="rounded-xl bg-card text-card-foreground border shadow-sm p-8 mb-8">
               {safeStepIndex === STEP.WELCOME && <WelcomeContent />}
+              {safeStepIndex === STEP.LOGIN && <LoginContent onLoginComplete={() => setLoginComplete(true)} />}
               {safeStepIndex === STEP.RUNTIME && <RuntimeContent onStatusChange={setRuntimeChecksPassed} />}
-              {safeStepIndex === STEP.PROVIDER && (
-                <ProviderContent
-                  providers={providers}
-                  selectedProvider={selectedProvider}
-                  onSelectProvider={setSelectedProvider}
-                  apiKey={apiKey}
-                  onApiKeyChange={setApiKey}
-                  onConfiguredChange={setProviderConfigured}
-                />
-              )}
               {safeStepIndex === STEP.INSTALLING && (
                 <InstallingContent
                   skills={getDefaultSkills(t)}
@@ -274,7 +268,7 @@ export function Setup() {
               )}
               {safeStepIndex === STEP.COMPLETE && (
                 <CompleteContent
-                  selectedProvider={selectedProvider}
+                  selectedProvider="garageclaw-platform"
                   installedSkills={installedSkills}
                 />
               )}
@@ -292,7 +286,7 @@ export function Setup() {
                   )}
                 </div>
                 <div className="flex gap-2">
-                  {!isLastStep && safeStepIndex !== STEP.RUNTIME && (
+                  {!isLastStep && safeStepIndex !== STEP.RUNTIME && safeStepIndex !== STEP.LOGIN && (
                     <Button variant="ghost" onClick={handleSkip}>
                       {t('nav.skipSetup')}
                     </Button>
@@ -372,6 +366,199 @@ function WelcomeContent() {
 
 interface RuntimeContentProps {
   onStatusChange: (canProceed: boolean) => void;
+}
+
+const LITELLM_PROXY_URL = 'https://garage-litellm.fly.dev';
+const LITELLM_MGMT_KEY = 'sk-NnZJvx8O4OfFGt2TIk2lcQ';
+const INITIAL_CREDITS = 1.0;
+
+interface LoginContentProps {
+  onLoginComplete: () => void;
+}
+
+function LoginContent({ onLoginComplete }: LoginContentProps) {
+  const { t } = useTranslation('setup');
+  const [mode, setMode] = useState<'login' | 'register'>('login');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [done, setDone] = useState(false);
+
+  const user = usePlatformStore((s) => s.user);
+  const signIn = usePlatformStore((s) => s.signIn);
+  const ensureLitellmKey = usePlatformStore((s) => s.ensureLitellmKey);
+  const loadProfile = usePlatformStore((s) => s.loadProfile);
+
+  // If already logged in, auto-complete
+  useEffect(() => {
+    if (user && !done) {
+      setDone(true);
+      onLoginComplete();
+    }
+  }, [user, done, onLoginComplete]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setLoading(true);
+
+    try {
+      if (mode === 'register') {
+        // Register via Supabase
+        const { supabase } = await import('@/lib/supabase');
+        const { error: signUpError } = await supabase.auth.signUp({ email, password });
+        if (signUpError) {
+          setError(signUpError.message);
+          setLoading(false);
+          return;
+        }
+        // Auto sign in after register
+        const loginErr = await signIn(email, password);
+        if (loginErr) {
+          setError(loginErr);
+          setLoading(false);
+          return;
+        }
+      } else {
+        const loginErr = await signIn(email, password);
+        if (loginErr) {
+          setError(loginErr);
+          setLoading(false);
+          return;
+        }
+      }
+
+      // Ensure LiteLLM key and provider are configured
+      await loadProfile();
+      await ensureLitellmKey();
+
+      // Assign initial credits for new users via LiteLLM management API
+      try {
+        const { supabase } = await import('@/lib/supabase');
+        const { data: { user: currentUser } } = await supabase.auth.getUser();
+        if (currentUser) {
+          // Check if user already has credits (not a new user)
+          const { data: balance } = await supabase.rpc('get_balance', { p_user_id: currentUser.id });
+          if (typeof balance === 'number' && balance <= 0) {
+            // Grant initial credits in Supabase
+            await supabase.from('credit_ledger').insert({
+              user_id: currentUser.id,
+              type: 'topup',
+              amount: INITIAL_CREDITS,
+              balance_after: INITIAL_CREDITS,
+              description: 'Welcome bonus credits',
+            });
+
+            // Update LiteLLM virtual key budget
+            const { litellmKey } = usePlatformStore.getState();
+            if (litellmKey) {
+              await fetch(`${LITELLM_PROXY_URL}/key/update`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${LITELLM_MGMT_KEY}`,
+                },
+                body: JSON.stringify({
+                  key: litellmKey,
+                  max_budget: INITIAL_CREDITS,
+                }),
+              });
+            }
+          }
+        }
+      } catch {
+        // Non-critical: credits assignment failed, continue anyway
+        console.error('[Setup] Failed to assign initial credits');
+      }
+
+      setDone(true);
+      onLoginComplete();
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (done) {
+    return (
+      <div className="text-center space-y-4">
+        <CheckCircle2 className="h-12 w-12 text-green-500 mx-auto" />
+        <h2 className="text-xl font-semibold">{t('login.success', '登录成功')}</h2>
+        <p className="text-muted-foreground">{t('login.successDesc', '平台账号已配置，AI 服务已就绪')}</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="text-center">
+        <h2 className="text-xl font-semibold">
+          {mode === 'login'
+            ? t('login.title', '登录你的账号')
+            : t('login.registerTitle', '注册新账号')}
+        </h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          {t('login.hint', '登录后自动配置 AI 服务和平台额度')}
+        </p>
+      </div>
+
+      <form onSubmit={handleSubmit} className="space-y-4 max-w-sm mx-auto">
+        <div>
+          <Label htmlFor="setup-email">{t('login.email', '邮箱')}</Label>
+          <Input
+            id="setup-email"
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+            placeholder="you@example.com"
+            className="mt-1"
+          />
+        </div>
+        <div>
+          <Label htmlFor="setup-password">{t('login.password', '密码')}</Label>
+          <Input
+            id="setup-password"
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            placeholder="••••••••"
+            className="mt-1"
+          />
+        </div>
+
+        {error && (
+          <div className="flex items-center gap-2 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+            <AlertCircle className="h-4 w-4 shrink-0" />
+            {error}
+          </div>
+        )}
+
+        <Button type="submit" className="w-full" disabled={loading}>
+          {loading ? (
+            <><Loader2 className="h-4 w-4 mr-2 animate-spin" />{t('login.loading', '处理中...')}</>
+          ) : mode === 'login' ? (
+            t('login.submit', '登录')
+          ) : (
+            t('login.registerSubmit', '注册')
+          )}
+        </Button>
+
+        <div className="text-center text-sm text-muted-foreground">
+          {mode === 'login' ? (
+            <button type="button" className="underline" onClick={() => { setMode('register'); setError(null); }}>
+              {t('login.switchToRegister', '没有账号？注册')}
+            </button>
+          ) : (
+            <button type="button" className="underline" onClick={() => { setMode('login'); setError(null); }}>
+              {t('login.switchToLogin', '已有账号？登录')}
+            </button>
+          )}
+        </div>
+      </form>
+    </div>
+  );
 }
 
 function RuntimeContent({ onStatusChange }: RuntimeContentProps) {
