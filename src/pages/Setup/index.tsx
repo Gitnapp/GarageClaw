@@ -380,10 +380,10 @@ interface LoginContentProps {
 
 function LoginContent({ onLoginComplete }: LoginContentProps) {
   const { t } = useTranslation('setup');
-  const [mode, setMode] = useState<'login' | 'register'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [info, setInfo] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
 
@@ -400,79 +400,80 @@ function LoginContent({ onLoginComplete }: LoginContentProps) {
     }
   }, [user, done, onLoginComplete]);
 
+  const completeLogin = async () => {
+    await loadProfile();
+    await ensureLitellmKey();
+
+    try {
+      const { supabase } = await import('@/lib/supabase');
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      if (currentUser) {
+        const { data: result } = await supabase.rpc('grant_welcome_credits', {
+          p_user_id: currentUser.id,
+          p_amount: INITIAL_CREDITS,
+        });
+
+        const granted = result && typeof result === 'object' && 'granted' in result && result.granted;
+        if (granted) {
+          const { litellmKey } = usePlatformStore.getState();
+          if (litellmKey) {
+            await fetch(`${LITELLM_PROXY_URL}/key/update`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${LITELLM_MGMT_KEY}`,
+              },
+              body: JSON.stringify({
+                key: litellmKey,
+                max_budget: INITIAL_CREDITS,
+              }),
+            });
+          }
+        }
+
+        await loadProfile();
+      }
+    } catch {
+      console.error('[Setup] Failed to assign initial credits');
+    }
+
+    setDone(true);
+    onLoginComplete();
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    setInfo(null);
     setLoading(true);
 
     try {
-      if (mode === 'register') {
-        // Register via Supabase
-        const { supabase } = await import('@/lib/supabase');
-        const { error: signUpError } = await supabase.auth.signUp({ email, password });
-        if (signUpError) {
-          setError(signUpError.message);
-          setLoading(false);
-          return;
-        }
-        // Auto sign in after register
-        const loginErr = await signIn(email, password);
-        if (loginErr) {
-          setError(loginErr);
-          setLoading(false);
-          return;
-        }
-      } else {
-        const loginErr = await signIn(email, password);
-        if (loginErr) {
-          setError(loginErr);
-          setLoading(false);
-          return;
-        }
+      // Try sign in first
+      const loginErr = await signIn(email, password);
+      if (!loginErr) {
+        await completeLogin();
+        return;
       }
 
-      // Ensure LiteLLM key and provider are configured
-      await loadProfile();
-      await ensureLitellmKey();
-
-      // Assign initial credits for new users via SECURITY DEFINER RPC + LiteLLM management API
-      try {
-        const { supabase } = await import('@/lib/supabase');
-        const { data: { user: currentUser } } = await supabase.auth.getUser();
-        if (currentUser) {
-          const { data: result } = await supabase.rpc('grant_welcome_credits', {
-            p_user_id: currentUser.id,
-            p_amount: INITIAL_CREDITS,
-          });
-
-          const granted = result && typeof result === 'object' && 'granted' in result && result.granted;
-          if (granted) {
-            // Update LiteLLM virtual key budget to match new balance
-            const { litellmKey } = usePlatformStore.getState();
-            if (litellmKey) {
-              await fetch(`${LITELLM_PROXY_URL}/key/update`, {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  'Authorization': `Bearer ${LITELLM_MGMT_KEY}`,
-                },
-                body: JSON.stringify({
-                  key: litellmKey,
-                  max_budget: INITIAL_CREDITS,
-                }),
-              });
-            }
-          }
-
-          // Refresh profile to show updated balance
-          await loadProfile();
-        }
-      } catch {
-        console.error('[Setup] Failed to assign initial credits');
+      // If login failed, try to register
+      const { supabase } = await import('@/lib/supabase');
+      const { error: signUpError } = await supabase.auth.signUp({ email, password });
+      if (signUpError) {
+        setError(signUpError.message);
+        return;
       }
 
-      setDone(true);
-      onLoginComplete();
+      // Try auto sign in after register
+      const retryErr = await signIn(email, password);
+      if (!retryErr) {
+        await completeLogin();
+        return;
+      }
+
+      // If still can't sign in, email confirmation is likely required
+      setInfo('已发送确认邮件到你的邮箱，请点击邮件中的确认链接，然后回到这里再次点击「继续」按钮。');
+    } catch (err) {
+      setError(String(err));
     } finally {
       setLoading(false);
     }
@@ -482,8 +483,8 @@ function LoginContent({ onLoginComplete }: LoginContentProps) {
     return (
       <div className="text-center space-y-4">
         <CheckCircle2 className="h-12 w-12 text-green-500 mx-auto" />
-        <h2 className="text-xl font-semibold">{t('login.success', '登录成功')}</h2>
-        <p className="text-muted-foreground">{t('login.successDesc', '平台账号已配置，AI 服务已就绪')}</p>
+        <h2 className="text-xl font-semibold">登录成功</h2>
+        <p className="text-muted-foreground">平台账号已配置，AI 服务已就绪</p>
       </div>
     );
   }
@@ -491,19 +492,15 @@ function LoginContent({ onLoginComplete }: LoginContentProps) {
   return (
     <div className="space-y-6">
       <div className="text-center">
-        <h2 className="text-xl font-semibold">
-          {mode === 'login'
-            ? t('login.title', '登录你的账号')
-            : t('login.registerTitle', '注册新账号')}
-        </h2>
+        <h2 className="text-xl font-semibold">登录 / 注册</h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          {t('login.hint', '登录后自动配置 AI 服务和平台额度')}
+          输入邮箱和密码，已有账号直接登录，新用户自动注册
         </p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4 max-w-sm mx-auto">
         <div>
-          <Label htmlFor="setup-email">{t('login.email', '邮箱')}</Label>
+          <Label htmlFor="setup-email">邮箱</Label>
           <Input
             id="setup-email"
             type="email"
@@ -515,7 +512,7 @@ function LoginContent({ onLoginComplete }: LoginContentProps) {
           />
         </div>
         <div>
-          <Label htmlFor="setup-password">{t('login.password', '密码')}</Label>
+          <Label htmlFor="setup-password">密码</Label>
           <Input
             id="setup-password"
             type="password"
@@ -524,10 +521,18 @@ function LoginContent({ onLoginComplete }: LoginContentProps) {
             required
             placeholder="••••••••"
             className="mt-1"
+            minLength={6}
           />
         </div>
 
-        {error && (
+        {info && (
+          <div className="flex items-start gap-2 rounded-md border border-primary/30 bg-primary/5 px-3 py-3 text-sm text-foreground">
+            <Check className="h-4 w-4 shrink-0 mt-0.5 text-primary" />
+            <span>{info}</span>
+          </div>
+        )}
+
+        {error && !info && (
           <div className="flex items-center gap-2 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
             <AlertCircle className="h-4 w-4 shrink-0" />
             {error}
@@ -536,25 +541,13 @@ function LoginContent({ onLoginComplete }: LoginContentProps) {
 
         <Button type="submit" className="w-full" disabled={loading}>
           {loading ? (
-            <><Loader2 className="h-4 w-4 mr-2 animate-spin" />{t('login.loading', '处理中...')}</>
-          ) : mode === 'login' ? (
-            t('login.submit', '登录')
+            <><Loader2 className="h-4 w-4 mr-2 animate-spin" />处理中...</>
+          ) : info ? (
+            '已确认，继续'
           ) : (
-            t('login.registerSubmit', '注册')
+            '继续'
           )}
         </Button>
-
-        <div className="text-center text-sm text-muted-foreground">
-          {mode === 'login' ? (
-            <button type="button" className="underline" onClick={() => { setMode('register'); setError(null); }}>
-              {t('login.switchToRegister', '没有账号？注册')}
-            </button>
-          ) : (
-            <button type="button" className="underline" onClick={() => { setMode('login'); setError(null); }}>
-              {t('login.switchToLogin', '已有账号？登录')}
-            </button>
-          )}
-        </div>
       </form>
     </div>
   );
