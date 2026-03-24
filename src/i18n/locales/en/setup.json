@@ -4,6 +4,10 @@
             "title": "Welcome to GarageClaw",
             "description": "Your AI assistant is ready to be configured"
         },
+        "login": {
+            "title": "Sign In",
+            "description": "Sign in or create your GarageClaw platform account"
+        },
         "runtime": {
             "title": "Environment Check",
             "description": "Verifying system requirements"

@@ -4,6 +4,10 @@
             "title": "GarageClawへようこそ",
             "description": "AIアシスタントの設定準備が整いました"
         },
+        "login": {
+            "title": "ログイン",
+            "description": "GarageClaw プラットフォームアカウントにログインまたは登録"
+        },
         "runtime": {
             "title": "環境チェック",
             "description": "システム要件を確認中"

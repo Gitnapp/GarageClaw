@@ -4,6 +4,10 @@
             "title": "欢迎使用 GarageClaw",
             "description": "您的 AI 助手已准备好进行配置"
         },
+        "login": {
+            "title": "登录平台",
+            "description": "登录或注册你的 GarageClaw 平台账号"
+        },
         "runtime": {
             "title": "环境检查",
             "description": "验证系统要求"
