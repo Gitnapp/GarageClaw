@@ -1,5 +1,18 @@
 # Changelog
 
+## [2026-03-25] 版本升级至 0.3.0-alpha.1
+
+**改动文件：**
+- `package.json` — version 从 `0.3.0-alpha.0` 升至 `0.3.0-alpha.1`
+
+**变更说明：**
+Bump 版本号以触发 CI 构建新的 release 包（含 deep link 邮箱验证功能）。
+
+**影响范围：**
+打包 / CI
+
+---
+
 ## [2026-03-25] Supabase 邮箱验证 Deep Link 支持
 
 **改动文件：**
